@@ -91,11 +91,11 @@ export default function NewTechnician() {
 
     } catch (error: any) {
       setLoading(false);
-      let message = "No se pudo registrar el perfil técnico.";
-      if (error && error.message && error.message.includes('UNIQUE constraint failed: users.email')) {
+      let message = error.message || "No se pudo registrar el perfil técnico.";
+      if (message.includes('UNIQUE constraint failed: users.email')) {
         message = "El correo ya está en uso en el sistema.";
       }
-      toast({ variant: "destructive", title: "Error", description: message });
+      toast({ variant: "destructive", title: "Error de Registro", description: message });
     }
   };
 

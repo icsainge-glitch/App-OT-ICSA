@@ -595,7 +595,10 @@ export async function createPersonnelAccount(personnelData: any, password: strin
         name: personnelData.nombre_t,
         rut: personnelData.rut_t || null
     });
-    if (userError) throw userError;
+    if (userError) {
+        console.error("Error al insertar en users:", userError);
+        throw new Error(`Error en tabla users: ${userError.message}`);
+    }
 
     // Create Personnel record
     const { error: personnelError } = await supabase.from('personnel').insert({
@@ -612,7 +615,10 @@ export async function createPersonnelAccount(personnelData: any, password: strin
         createdAt: personnelData.createdAt,
         updatedBy: personnelData.registeredBy
     });
-    if (personnelError) throw personnelError;
+    if (personnelError) {
+        console.error("Error al insertar en personnel:", personnelError);
+        throw new Error(`Error en tabla personnel: ${personnelError.message}`);
+    }
 
     revalidatePath('/technicians');
     revalidatePath('/dashboard');

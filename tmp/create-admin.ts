@@ -60,25 +60,16 @@ async function createAdmin() {
     console.log('Lectura de users exitosa. Datos encontrados:', testRead?.length || 0)
   }
 
-  // 3. Try to sync profile in public.users if not exists
-  console.log('Verificando perfil en tabla public "users"...')
-  const { data: profile } = await supabase.from('users').select('id').eq('email', email).single()
-
-  if (!profile) {
-    console.log('Insertando perfil en tabla "users"...')
-    const { error: uErr } = await supabase.from('users').insert({
-      id,
-      email,
-      password,
-      role: 'Admin',
-      name,
-      rut: '1-1'
-    })
-    if (uErr) console.error('Error al insertar perfil en users:', uErr.message)
-    else console.log('Perfil creado en users.')
-  } else {
-    console.log('Perfil ya existe en users.')
-  }
+  // 3. Sync profile in public.users (UPDATE by email)
+  console.log('Sincronizando perfil en tabla "users"...')
+  const { error: uErr } = await supabase.from('users').update({
+    password,
+    role: 'Admin',
+    name
+  }).eq('email', email)
+  
+  if (uErr) console.error('Error al sincronizar perfil en users:', uErr.message)
+  else console.log('Perfil sincronizado en users (Auth y DB).')
 
   // 4. Try to sync in personnel
   console.log('Verificando perfil en tabla "personnel"...')

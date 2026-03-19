@@ -70,6 +70,7 @@ export function CapacitacionForm({ initialData }: { initialData?: any }) {
   const [folio, setFolio] = useState<number | string>(initialData?.folio || 0);
   const [personnel, setPersonnel] = useState<any[]>([]);
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
+  const [selectedPersonnelIds, setSelectedPersonnelIds] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchPersonnel = async () => {
@@ -117,15 +118,35 @@ export function CapacitacionForm({ initialData }: { initialData?: any }) {
   };
 
   const addAssistantsFromPersonnel = (selected: any[]) => {
-    const newAssistants = selected.map(p => ({
-      nombre: p.nombre_t || "",
-      rut: p.rut_t || p.rut || "",
-      cargo: p.cargo_t || p.cargo || "",
-      firma: ""
-    }));
+    const existingRuts = new Set(assistants.map(a => a.rut));
+    const newAssistants = selected
+      .filter(p => !existingRuts.has(p.rut_t || p.rut))
+      .map(p => ({
+        nombre: p.nombre_t || "",
+        rut: p.rut_t || p.rut || "",
+        cargo: p.cargo_t || p.cargo || "",
+        firma: ""
+      }));
+    
     setAssistants(prev => [...prev, ...newAssistants]);
     setIsSelectModalOpen(false);
-    toast({ title: "Asistentes agregados", description: `Se han añadido ${selected.length} personas a la lista.` });
+    setSelectedPersonnelIds([]);
+    if (newAssistants.length > 0) {
+      toast({ title: "Asistentes agregados", description: `Se han añadido ${newAssistants.length} personas a la lista.` });
+    } else {
+      toast({ title: "Sin cambios", description: "El personal seleccionado ya estaba en la lista." });
+    }
+  };
+
+  const togglePersonnelSelection = (id: string) => {
+    setSelectedPersonnelIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const confirmSelection = () => {
+    const selected = personnel.filter(p => selectedPersonnelIds.includes(p.id));
+    addAssistantsFromPersonnel(selected);
   };
 
   const removeAssistant = (index: number) => {
@@ -300,7 +321,10 @@ export function CapacitacionForm({ initialData }: { initialData?: any }) {
                 <div className="flex justify-between items-center">
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest leading-relaxed">Asistentes a la charla:</p>
                   <div className="flex gap-2">
-                    <Dialog open={isSelectModalOpen} onOpenChange={setIsSelectModalOpen}>
+                    <Dialog open={isSelectModalOpen} onOpenChange={(val) => {
+                      setIsSelectModalOpen(val);
+                      if (!val) setSelectedPersonnelIds([]);
+                    }}>
                       <DialogTrigger asChild>
                         <Button type="button" variant="outline" size="sm" className="h-10 px-4 text-[10px] font-black uppercase rounded-xl border-primary bg-primary/5 text-primary">
                           <Search className="h-4 w-4 mr-2" /> Seleccionar de Nómina
@@ -312,29 +336,47 @@ export function CapacitacionForm({ initialData }: { initialData?: any }) {
                         </DialogHeader>
                         <Command className="border-none">
                           <CommandInput placeholder="Buscar por nombre o RUT..." className="h-14 font-bold border-none" />
-                          <CommandList className="max-h-[300px] p-2">
+                          <CommandList className="max-h-[350px] p-2">
                             <CommandEmpty className="py-10 text-center font-bold text-muted-foreground">No se encontraron resultados.</CommandEmpty>
                             <CommandGroup>
-                              {personnel.map((p) => (
-                                <CommandItem
-                                  key={p.id}
-                                  onSelect={() => addAssistantsFromPersonnel([p])}
-                                  className="p-4 rounded-xl cursor-pointer hover:bg-primary/5 transition-all"
-                                >
-                                  <div className="flex items-center gap-4 w-full">
-                                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-xs shrink-0">
-                                      {p.nombre_t?.substring(0, 2).toUpperCase()}
+                              {personnel.map((p) => {
+                                const isSelected = selectedPersonnelIds.includes(p.id);
+                                const isAlreadyInList = assistants.some(a => a.rut === (p.rut_t || p.rut));
+                                return (
+                                  <CommandItem
+                                    key={p.id}
+                                    onSelect={() => !isAlreadyInList && togglePersonnelSelection(p.id)}
+                                    className={`p-4 rounded-xl cursor-pointer transition-all ${isAlreadyInList ? 'opacity-50 grayscale' : 'hover:bg-primary/5'}`}
+                                  >
+                                    <div className="flex items-center gap-4 w-full">
+                                      <div className={`h-10 w-10 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${
+                                        isSelected ? 'bg-primary text-white' : 'bg-primary/10 text-primary'
+                                      }`}>
+                                        {isSelected ? <Check className="h-5 w-5" /> : p.nombre_t?.substring(0, 2).toUpperCase()}
+                                      </div>
+                                      <div className="flex flex-col flex-1">
+                                        <span className="font-black text-xs uppercase text-primary">{p.nombre_t}</span>
+                                        <span className="text-[10px] font-medium text-muted-foreground">{p.rut_t || p.rut || 'Sin RUT'}</span>
+                                      </div>
+                                      {isAlreadyInList && <Badge variant="outline" className="text-[8px] uppercase">Ya agregado</Badge>}
                                     </div>
-                                    <div className="flex flex-col flex-1">
-                                      <span className="font-black text-xs uppercase text-primary">{p.nombre_t}</span>
-                                      <span className="text-[10px] font-medium text-muted-foreground">{p.rut_t || p.rut || 'Sin RUT'}</span>
-                                    </div>
-                                    <Check className="h-4 w-4 text-primary opacity-0 group-aria-selected:opacity-100" />
-                                  </div>
-                                </CommandItem>
-                              ))}
+                                  </CommandItem>
+                                );
+                              })}
                             </CommandGroup>
                           </CommandList>
+                          <div className="p-4 bg-muted/30 border-t flex flex-col gap-2">
+                            <span className="text-[10px] font-black uppercase text-center text-muted-foreground">
+                              {selectedPersonnelIds.length} seleccionados
+                            </span>
+                            <Button 
+                              onClick={confirmSelection} 
+                              disabled={selectedPersonnelIds.length === 0}
+                              className="w-full h-12 rounded-xl font-black uppercase text-xs tracking-widest"
+                            >
+                              Agregar Asistentes
+                            </Button>
+                          </div>
                         </Command>
                       </DialogContent>
                     </Dialog>

@@ -15,14 +15,30 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, ArrowRight, Save, User, Briefcase, 
   CheckCircle2, Plus, Trash2, Shield, AlertTriangle, 
-  Wrench, Users, Camera, X, Loader2 
+  Wrench, Users, Camera, X, Loader2, Search, Check
 } from "lucide-react";
 import { useUser, useUserProfile } from "@/lib/auth-provider";
-import { getActiveProjects, saveHPT, getNextFolioHPT } from "@/actions/db-actions";
+import { getActiveProjects, saveHPT, getNextFolioHPT, getPersonnel } from "@/actions/db-actions";
 import { useActionData } from "@/hooks/use-action-data";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 const STEPS = [
-  { id: 'general', title: 'General y Equipo', icon: Briefcase },
+  { id: 'general', title: 'Información General', icon: Briefcase },
+  { id: 'team', title: 'Equipo de Trabajo', icon: Users },
   { id: 'resources', title: 'Recursos y Permisos', icon: Wrench },
   { id: 'risks', title: 'Riesgos Potenciales', icon: AlertTriangle },
   { id: 'medidas', title: 'Medidas Seguridad', icon: CheckCircle2 },
@@ -113,9 +129,20 @@ export function HPTForm({ initialData }: { initialData?: any }) {
 
   const [workers, setWorkers] = useState<any[]>(initialData?.workers || []);
   const [folio, setFolio] = useState<number | string>(initialData?.folio || 0);
+  const [personnel, setPersonnel] = useState<any[]>([]);
+  const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
+  const [selectedPersonnelIds, setSelectedPersonnelIds] = useState<string[]>([]);
 
   const isAdmin = userProfile?.rol_t?.toLowerCase() === 'admin' || 
     userProfile?.rol_t?.toLowerCase() === 'administrador';
+
+  useEffect(() => {
+    const fetchPersonnel = async () => {
+      const data = await getPersonnel();
+      setPersonnel(data);
+    };
+    fetchPersonnel();
+  }, []);
 
   const { data: projects } = useActionData<any[]>(() => {
     if (!user?.uid || isProfileLoading) return Promise.resolve([]);
@@ -157,6 +184,38 @@ export function HPTForm({ initialData }: { initialData?: any }) {
 
   const addWorker = () => {
     setWorkers(prev => [...prev, { nombre: "", rut: "", cargo: "", firma: "" }]);
+  };
+
+  const addWorkersFromPersonnel = (selected: any[]) => {
+    const existingRuts = new Set(workers.map(w => w.rut));
+    const newWorkers = selected
+      .filter(p => !existingRuts.has(p.rut_t || p.rut))
+      .map(p => ({
+        nombre: p.nombre_t || "",
+        rut: p.rut_t || p.rut || "",
+        cargo: p.cargo_t || p.cargo || "",
+        firma: ""
+      }));
+    
+    setWorkers(prev => [...prev, ...newWorkers].slice(0, 10)); // Increased to 10 based on photo
+    setIsSelectModalOpen(false);
+    setSelectedPersonnelIds([]);
+    if (newWorkers.length > 0) {
+      toast({ title: "Personal agregado", description: `Se han añadido ${newWorkers.length} personas al equipo.` });
+    } else {
+      toast({ title: "Sin cambios", description: "El personal seleccionado ya estaba en la lista." });
+    }
+  };
+
+  const togglePersonnelSelection = (id: string) => {
+    setSelectedPersonnelIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const confirmSelection = () => {
+    const selected = personnel.filter(p => selectedPersonnelIds.includes(p.id));
+    addWorkersFromPersonnel(selected);
   };
 
   const removeWorker = (index: number) => {
@@ -292,19 +351,91 @@ export function HPTForm({ initialData }: { initialData?: any }) {
                   </div>
                 </div>
 
+                <div className="space-y-2">
+                  <Label className="font-black uppercase text-[10px] text-muted-foreground ml-1">Trabajo a Realizar ¿Cómo Ejecutaré Mi trabajo?</Label>
+                  <Textarea placeholder="Describa el trabajo detalladamente..." value={formData.trabajoRealizar} onChange={(e) => setFormData(prev => ({ ...prev, trabajoRealizar: e.target.value }))} className="min-h-[150px] bg-muted/30 border-none rounded-3xl p-6 font-medium text-sm shadow-inner resize-none" />
+                </div>
+              </div>
+            )}
+
+            {/* Step 1: Team Selection */}
+            {currentStep === 1 && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="space-y-6">
                   <div className="flex justify-between items-center">
-                    <Label className="font-black uppercase text-[10px] text-muted-foreground ml-1 tracking-[0.2em]">Equipo de Trabajo (Máx 6)</Label>
-                    {workers.length < 6 && (
-                      <Button type="button" onClick={addWorker} variant="outline" size="sm" className="h-10 px-4 text-[10px] font-black uppercase rounded-xl border-primary/20 text-primary">
-                        <Plus className="h-4 w-4 mr-2" /> Añadir Persona
-                      </Button>
-                    )}
+                    <Label className="font-black uppercase text-[10px] text-muted-foreground ml-1 tracking-[0.2em]">Equipo de Trabajo (Máx 10)</Label>
+                    <div className="flex gap-2">
+                      <Dialog open={isSelectModalOpen} onOpenChange={(val) => {
+                        setIsSelectModalOpen(val);
+                        if (!val) setSelectedPersonnelIds([]);
+                      }}>
+                        <DialogTrigger asChild>
+                          <Button type="button" variant="outline" size="sm" className="h-10 px-4 text-[10px] font-black uppercase rounded-xl border-primary bg-primary/5 text-primary">
+                            <Search className="h-4 w-4 mr-2" /> Seleccionar de Nómina
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-md rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl">
+                          <DialogHeader className="p-8 bg-primary/5 border-b border-black/5">
+                            <DialogTitle className="text-xl font-black text-primary uppercase tracking-tighter">Seleccionar Equipo</DialogTitle>
+                          </DialogHeader>
+                          <Command className="border-none">
+                            <CommandInput placeholder="Buscar por nombre o RUT..." className="h-14 font-bold border-none" />
+                            <CommandList className="max-h-[350px] p-2">
+                              <CommandEmpty className="py-10 text-center font-bold text-muted-foreground">No se encontraron resultados.</CommandEmpty>
+                              <CommandGroup>
+                                {personnel.map((p) => {
+                                  const isSelected = selectedPersonnelIds.includes(p.id);
+                                  const isAlreadyInTeam = workers.some(w => w.rut === (p.rut_t || p.rut));
+                                  return (
+                                    <CommandItem
+                                      key={p.id}
+                                      onSelect={() => !isAlreadyInTeam && togglePersonnelSelection(p.id)}
+                                      className={`p-4 rounded-xl cursor-pointer transition-all ${isAlreadyInTeam ? 'opacity-50 grayscale' : 'hover:bg-primary/5'}`}
+                                    >
+                                      <div className="flex items-center gap-4 w-full">
+                                        <div className={`h-10 w-10 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${
+                                          isSelected ? 'bg-primary text-white' : 'bg-primary/10 text-primary'
+                                        }`}>
+                                          {isSelected ? <Check className="h-5 w-5" /> : p.nombre_t?.substring(0, 2).toUpperCase()}
+                                        </div>
+                                        <div className="flex flex-col flex-1">
+                                          <span className="font-black text-xs uppercase text-primary">{p.nombre_t}</span>
+                                          <span className="text-[10px] font-medium text-muted-foreground">{p.rut_t || p.rut || 'Sin RUT'}</span>
+                                        </div>
+                                        {isAlreadyInTeam && <Badge variant="outline" className="text-[8px] uppercase">En equipo</Badge>}
+                                      </div>
+                                    </CommandItem>
+                                  );
+                                })}
+                              </CommandGroup>
+                            </CommandList>
+                            <div className="p-4 bg-muted/30 border-t flex flex-col gap-2">
+                              <span className="text-[10px] font-black uppercase text-center text-muted-foreground">
+                                {selectedPersonnelIds.length} seleccionados
+                              </span>
+                              <Button 
+                                onClick={confirmSelection} 
+                                disabled={selectedPersonnelIds.length === 0}
+                                className="w-full h-12 rounded-xl font-black uppercase text-xs tracking-widest"
+                              >
+                                Agregar al Equipo
+                              </Button>
+                            </div>
+                          </Command>
+                        </DialogContent>
+                      </Dialog>
+
+                      {workers.length < 10 && (
+                        <Button type="button" onClick={addWorker} variant="outline" size="sm" className="h-10 px-4 text-[10px] font-black uppercase rounded-xl border-primary/20 text-primary">
+                          <Plus className="h-4 w-4 mr-2" /> Manual
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-4">
                     {workers.map((worker, idx) => (
-                      <Card key={idx} className="bg-muted/10 border-none rounded-3xl p-6 relative">
-                        <Button type="button" size="icon" variant="ghost" className="absolute top-2 right-2 text-destructive" onClick={() => removeWorker(idx)}>
+                      <Card key={idx} className="bg-muted/10 border-none rounded-3xl p-6 relative group border-2 border-transparent hover:border-primary/5 transition-all">
+                        <Button type="button" size="icon" variant="ghost" className="absolute top-2 right-2 text-destructive opacity-40 group-hover:opacity-100 transition-opacity" onClick={() => removeWorker(idx)}>
                           <X className="h-5 w-5" />
                         </Button>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
@@ -330,18 +461,19 @@ export function HPTForm({ initialData }: { initialData?: any }) {
                         </div>
                       </Card>
                     ))}
+                    {workers.length === 0 && (
+                      <div className="text-center py-10 opacity-30 border-2 border-dashed border-black/10 rounded-[2rem] flex flex-col items-center gap-4">
+                        <Users className="h-10 w-10" />
+                        <p className="font-black uppercase text-[10px] tracking-[0.2em]">Equipo Vacío</p>
+                      </div>
+                    )}
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="font-black uppercase text-[10px] text-muted-foreground ml-1">Trabajo a Realizar ¿Cómo Ejecutaré Mi trabajo?</Label>
-                  <Textarea placeholder="Describa el trabajo detalladamente..." value={formData.trabajoRealizar} onChange={(e) => setFormData(prev => ({ ...prev, trabajoRealizar: e.target.value }))} className="min-h-[150px] bg-muted/30 border-none rounded-3xl p-6 font-medium text-sm shadow-inner resize-none" />
                 </div>
               </div>
             )}
 
-            {/* Step 1: Resources */}
-            {currentStep === 1 && (
+            {/* Step 2: Resources */}
+            {currentStep === 2 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest leading-relaxed">RECURSOS / COORDINACIÓN / PERMISOS:</p>
                 <div className="grid grid-cols-1 gap-4">
@@ -377,8 +509,8 @@ export function HPTForm({ initialData }: { initialData?: any }) {
               </div>
             )}
 
-            {/* Step 2: Risks */}
-            {currentStep === 2 && (
+            {/* Step 3: Risks */}
+            {currentStep === 3 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-y-auto max-h-[60vh] pr-2 custom-scrollbar">
                 <p className="text-xs font-black text-primary uppercase tracking-widest mb-4">IDENTIFICACIÓN DE ACCIDENTES POTENCIALES O RIESGOS ASOCIADOS:</p>
                 <div className="grid grid-cols-1 gap-3">
@@ -429,8 +561,8 @@ export function HPTForm({ initialData }: { initialData?: any }) {
               </div>
             )}
 
-            {/* Step 3: Safety Measures */}
-            {currentStep === 3 && (
+            {/* Step 4: Safety Measures */}
+            {currentStep === 4 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-y-auto max-h-[60vh] pr-2 custom-scrollbar">
                 <p className="text-xs font-black text-primary uppercase tracking-widest mb-4">IDENTIFICACIÓN DE LAS MEDIDAS DE SEGURIDAD:</p>
                 <div className="grid grid-cols-1 gap-3">
@@ -474,8 +606,8 @@ export function HPTForm({ initialData }: { initialData?: any }) {
               </div>
             )}
 
-            {/* Step 4: EPP */}
-            {currentStep === 4 && (
+            {/* Step 5: EPP */}
+            {currentStep === 5 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <p className="text-xs font-black text-primary uppercase tracking-widest">EQUIPOS DE PROTECCIÓN Y ELEMENTOS DE SEGURIDAD REQUERIDOS:</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -512,8 +644,8 @@ export function HPTForm({ initialData }: { initialData?: any }) {
             )}
 
 
-            {/* Step 5: Final Signature */}
-            {currentStep === 5 && (
+            {/* Step 6: Final Signature */}
+            {currentStep === 6 && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="bg-primary/5 rounded-3xl p-6 border border-primary/10">
                   <h4 className="font-black uppercase text-xs text-primary mb-2 flex items-center gap-2">
@@ -557,7 +689,7 @@ export function HPTForm({ initialData }: { initialData?: any }) {
             )}
 
             {/* Navigation Buttons */}
-            {currentStep < 5 && (
+            {currentStep < 6 && (
               <div className="flex gap-4 pt-8 border-t border-black/5">
                 {currentStep > 0 && (
                   <Button type="button" variant="outline" onClick={handleBack} className="h-16 flex-1 rounded-2xl border-none bg-muted/50 font-black uppercase text-xs tracking-widest hover:bg-muted group">

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Plus, Search, LogOut, LayoutDashboard,
-  Eye, Download, Users, UserRound,
+  Eye, Download, Users, UserRound, Building2,
   Trash2, History, Briefcase, FolderOpen, ClipboardList, BookOpen, Pencil, Menu, ChevronRight, FileText, Info, Clock, CheckCircle, Loader2, ArrowRight, Wrench, Package, Filter, MoreHorizontal, X, RefreshCw
 } from "lucide-react";
 import Link from "next/link";
@@ -140,6 +140,16 @@ function DashboardContent() {
     if (reportModalOpen) return getToolMovements(reportPeriod);
     return Promise.resolve([]);
   }, [user?.uid, isProfileLoading, activeTab, reportModalOpen, reportPeriod]);
+
+  const { data: clientsData } = useActionData(() => {
+    if (!isAdmin) return Promise.resolve([]);
+    return getClients();
+  }, [isAdmin]);
+
+  const { data: personnelData } = useActionData(() => {
+    if (!isAdmin) return Promise.resolve([]);
+    return getPersonnel();
+  }, [isAdmin]);
 
   const activeProjects = useMemo(() => (projects || []).filter((p: any) => {
     const s = p.status?.toLowerCase();
@@ -461,6 +471,20 @@ function DashboardContent() {
                   <Plus size={18} className="mr-2" /> Nuevo Proyecto
                 </Button>
               </Link>
+              {isAdmin && (
+                <>
+                  <Link href="/clients/new">
+                    <Button className="bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl h-11 px-6 shadow-[0_8px_20px_rgba(79,70,229,0.3)] transition-all hover:-translate-y-0.5 active:scale-95">
+                      <Plus size={18} className="mr-2" /> Nuevo Cliente
+                    </Button>
+                  </Link>
+                  <Link href="/technicians/new">
+                    <Button className="bg-teal-600 hover:bg-teal-700 text-white font-black rounded-2xl h-11 px-6 shadow-[0_8px_20px_rgba(13,148,136,0.3)] transition-all hover:-translate-y-0.5 active:scale-95">
+                      <Plus size={18} className="mr-2" /> Nuevo Personal
+                    </Button>
+                  </Link>
+                </>
+              )}
               <Link href="/work-orders/new">
                 <Button className="bg-accent hover:bg-accent/90 text-primary font-black rounded-2xl h-11 px-6 shadow-[0_8px_20px_rgba(var(--accent),0.3)] transition-all hover:-translate-y-0.5 active:scale-95">
                   <Plus size={18} className="mr-2" /> Crear OT
@@ -533,6 +557,50 @@ function DashboardContent() {
                 </div>
               </CardContent>
             </Card>
+
+            {isAdmin && (
+              <>
+                <Card className="shadow-[0_10px_40px_rgba(0,0,0,0.03)] border-none bg-indigo-50/50 backdrop-blur-3xl rounded-3xl overflow-hidden hover:shadow-[0_10px_40px_rgba(79,70,229,0.1)] transition-all duration-500 cursor-pointer group" onClick={() => router.push("/clients")}>
+                  <CardHeader className="bg-indigo-600/5 p-6 border-b border-indigo-600/10">
+                    <CardTitle className="text-[11px] font-black uppercase text-indigo-700 tracking-[0.2em] flex items-center justify-between">
+                      <div className="flex items-center gap-3"><Users size={16} /> Gestión Clientes</div>
+                      <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-8 flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <Building2 size={32} className="text-indigo-600" />
+                    </div>
+                    <h3 className="font-black text-indigo-900 text-lg uppercase tracking-tighter mb-1">Cartera Clientes</h3>
+                    <p className="text-xs font-bold text-indigo-600/60 uppercase mb-6 leading-tight">Administra empresas, contactos y direcciones</p>
+                    <div className="w-full bg-white/50 p-4 rounded-2xl border border-indigo-100">
+                      <div className="text-2xl font-black text-indigo-700">{clientsData?.length || 0}</div>
+                      <div className="text-[10px] font-black text-indigo-600/40 uppercase tracking-widest">Registrados en Sistema</div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-[0_10px_40px_rgba(0,0,0,0.03)] border-none bg-teal-50/50 backdrop-blur-3xl rounded-3xl overflow-hidden hover:shadow-[0_10px_40px_rgba(13,148,136,0.1)] transition-all duration-500 cursor-pointer group" onClick={() => router.push("/technicians")}>
+                  <CardHeader className="bg-teal-600/5 p-6 border-b border-teal-600/10">
+                    <CardTitle className="text-[11px] font-black uppercase text-teal-700 tracking-[0.2em] flex items-center justify-between">
+                      <div className="flex items-center gap-3"><UserRound size={16} /> Control Personal</div>
+                      <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-8 flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 bg-teal-100 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <Users size={32} className="text-teal-600" />
+                    </div>
+                    <h3 className="font-black text-teal-900 text-lg uppercase tracking-tighter mb-1">Equipo Humano</h3>
+                    <p className="text-xs font-bold text-teal-600/60 uppercase mb-6 leading-tight">Garantiza el cumplimiento y registro de colaboradores</p>
+                    <div className="w-full bg-white/50 p-4 rounded-2xl border border-teal-100">
+                      <div className="text-2xl font-black text-teal-700">{personnelData?.length || 0}</div>
+                      <div className="text-[10px] font-black text-teal-600/40 uppercase tracking-widest">Colaboradores Activos</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </div>
         )}
 

@@ -23,7 +23,7 @@ export async function loginAction(email: string, password: string) {
 
         const { data: user, error } = await supabase
             .from('users')
-            .select('id, name, email, role, rut, signatureUrl')
+            .select('id, name, email, role, rut, signatureurl')
             .eq('email', email)
             .eq('password', password)
             .single();
@@ -77,7 +77,7 @@ export async function getUserProfile(uid: string) {
     try {
         const { data: user, error } = await supabase
             .from('users')
-            .select('id, name, email, role, rut, signatureUrl')
+            .select('id, name, email, role, rut, signatureurl')
             .eq('id', uid)
             .single();
             
@@ -89,7 +89,7 @@ export async function getUserProfile(uid: string) {
             rol_t: user.role,
             email: user.email,
             rut_t: user.rut,
-            signatureUrl: user.signatureUrl
+            signatureUrl: user.signatureurl
         };
     } catch (e: any) {
         console.error("Error en getUserProfile:", e);
@@ -101,7 +101,7 @@ export async function updateUserSignature(uid: string, signatureUrl: string) {
     try {
         const { error } = await supabase
             .from('users')
-            .update({ signatureUrl })
+            .update({ signatureurl: signatureUrl })
             .eq('id', uid);
             
         if (error) throw error;

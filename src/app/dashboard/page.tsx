@@ -20,7 +20,7 @@ import { generateWorkOrderPDF, generateToolReportPDF, generateBatchReturnActPDF 
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { useUser, useUserProfile } from "@/lib/auth-provider";
 import { useActionData } from "@/hooks/use-action-data";
-import { getActiveProjects, getWorkOrders, getArchivedWorkOrders, deleteRecord, hideWorkOrder, hideProject, getTools, saveTool, deleteTool, getToolMovements, approveToolReturn, returnMultipleTools, assignMultipleTools } from "@/actions/db-actions";
+import { getActiveProjects, getWorkOrders, getArchivedWorkOrders, deleteRecord, hideWorkOrder, hideProject, getTools, saveTool, deleteTool, getToolMovements, approveToolReturn, returnMultipleTools, assignMultipleTools, getClients, getPersonnel } from "@/actions/db-actions";
 import { logoutAction } from "@/actions/auth-actions";
 import { cn, formatFolio } from "@/lib/utils";
 import {
@@ -141,12 +141,12 @@ function DashboardContent() {
     return Promise.resolve([]);
   }, [user?.uid, isProfileLoading, activeTab, reportModalOpen, reportPeriod]);
 
-  const { data: clientsData } = useActionData(() => {
+  const { data: clientsData } = useActionData<any[]>(() => {
     if (!isAdmin) return Promise.resolve([]);
     return getClients();
   }, [isAdmin]);
 
-  const { data: personnelData } = useActionData(() => {
+  const { data: personnelData } = useActionData<any[]>(() => {
     if (!isAdmin) return Promise.resolve([]);
     return getPersonnel();
   }, [isAdmin]);

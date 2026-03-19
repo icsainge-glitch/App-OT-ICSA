@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 96%;
+    --foreground: 182 49% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 182 49% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 182 49% 10%;
+    --primary: 182 49% 43%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 149 65% 94%;
+    --secondary-foreground: 182 49% 30%;
+    --muted: 0 0% 92%;
+    --muted-foreground: 182 10% 40%;
+    --accent: 149 65% 56%;
+    --accent-foreground: 182 49% 15%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 182 10% 88%;
+    --input: 182 10% 88%;
+    --ring: 182 49% 43%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 182 49% 10%;
+    --foreground: 0 0% 98%;
+    --card: 182 49% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 182 49% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 149 65% 56%;
+    --primary-foreground: 182 49% 10%;
+    --secondary: 182 49% 20%;
+    --secondary-foreground: 149 65% 56%;
+    --muted: 182 49% 15%;
+    --muted-foreground: 182 10% 65%;
+    --accent: 149 65% 56%;
+    --accent-foreground: 182 49% 10%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 182 49% 20%;
+    --input: 182 49% 20%;
+    --ring: 149 65% 56%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body bg-slate-50;
+  }
+}
+
+@layer utilities {
+  .glassmorphism {
+    @apply bg-white/70 backdrop-blur-xl border border-white/40 shadow-xl shadow-black/5;
+  }
+
+  .glassmorphism-dark {
+    @apply bg-slate-900/70 backdrop-blur-xl border border-slate-700/50 shadow-2xl shadow-black/20;
+  }
+
+  .text-glow {
+    text-shadow: 0 0 20px rgba(var(--primary), 0.5);
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-pop-in {
+    animation: popIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes popIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
+
+.signature-canvas {
+  width: 100%;
+  height: 200px;
+  background-color: white;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+}

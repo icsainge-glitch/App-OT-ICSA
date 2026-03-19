@@ -283,7 +283,7 @@ export function CapacitacionForm({ initialData }: { initialData?: any }) {
             {currentStep === 1 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="space-y-2">
-                  <Label className="font-black uppercase text-[10px] text-muted-foreground ml-1">Temario / Contenido de la Capacitación</Label>
+                  <Label className="font-black uppercase text-[10px] text-muted-foreground ml-1">Temario / Contenido de la Charla</Label>
                   <Textarea 
                     placeholder="Describa los puntos tratados en la charla de seguridad..." 
                     value={formData.temario} 
@@ -298,7 +298,7 @@ export function CapacitacionForm({ initialData }: { initialData?: any }) {
             {currentStep === 2 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex justify-between items-center">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest leading-relaxed">Asistentes a la capacitación:</p>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest leading-relaxed">Asistentes a la charla:</p>
                   <div className="flex gap-2">
                     <Dialog open={isSelectModalOpen} onOpenChange={setIsSelectModalOpen}>
                       <DialogTrigger asChild>
@@ -387,7 +387,7 @@ export function CapacitacionForm({ initialData }: { initialData?: any }) {
                     <CheckCircle2 className="h-5 w-5" /> Cierre de Registro
                   </h4>
                   <p className="text-[11px] font-medium leading-relaxed opacity-80 italic">
-                    Certifico que he realizado la charla/capacitación descrita anteriormente, cumpliendo con los objetivos establecidos 
+                    Certifico que he realizado la charla de seguridad descrita anteriormente, cumpliendo con los objetivos establecidos 
                     y asegurando la asistencia y participación de las personas listadas.
                   </p>
                 </div>

@@ -42,7 +42,7 @@ export function MobileNav() {
         { label: "Control Herramientas", icon: Wrench, href: "/dashboard?tab=tools", active: activeTab === "tools" && pathname === "/dashboard" },
         { label: "Actas Herramientas", icon: History, href: "/dashboard?tab=tool-history", active: activeTab === "tool-history" && pathname === "/dashboard" },
         { label: "HPT (Seguridad)", icon: ClipboardList, href: "/hpt", active: pathname === "/hpt" || pathname === "/hpt/new" },
-        { label: "Capacitaciones", icon: BookOpen, href: "/capacitaciones", active: pathname === "/capacitaciones" || pathname === "/capacitaciones/new" },
+        { label: "Charlas", icon: BookOpen, href: "/capacitaciones", active: pathname === "/capacitaciones" || pathname === "/capacitaciones/new" },
     ].filter(item => {
         if (item.href === "/dashboard?tab=tool-history" && !isAdmin) return false;
         return true;

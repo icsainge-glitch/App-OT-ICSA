@@ -1054,8 +1054,8 @@ export const generateHPTPDF = async (data: any) => {
   doc.save(`HPT-${data.folio}-${new Date(data.fecha).toISOString().split('T')[0]}.pdf`);
 };
 
-// --- CAPACITACION PDF GENERATOR ---
-export const generateCapacitacionPDF = async (data: any) => {
+// --- CHARLA PDF GENERATOR ---
+export const generateCharlaPDF = async (data: any) => {
   const doc = new jsPDF();
   const primaryColor: [number, number, number] = [56, 163, 165];
   const darkGray: [number, number, number] = [40, 40, 40];
@@ -1070,7 +1070,7 @@ export const generateCapacitacionPDF = async (data: any) => {
   if (logoBase64) doc.addImage(logoBase64, "PNG", margin, 10, 45, 18);
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
-  doc.text("REGISTRO DE CAPACITACIÓN / CHARLA", pageWidth - margin, 20, { align: "right" });
+  doc.text("REGISTRO DE CHARLA DE SEGURIDAD", pageWidth - margin, 20, { align: "right" });
   
   doc.setFontSize(10);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -1080,7 +1080,7 @@ export const generateCapacitacionPDF = async (data: any) => {
 
   autoTable(doc, {
     startY: currentY,
-    head: [['DATOS DE LA CAPACITACIÓN']],
+    head: [['DATOS DE LA CHARLA']],
     body: [
       [`Relator: ${data.supervisorName || 'N/A'} | Cargo: ${data.cargo || 'N/A'}`],
       [`Lugar: ${data.lugar || 'N/A'} | Fecha: ${new Date(data.fecha).toLocaleDateString('es-CL')}`],

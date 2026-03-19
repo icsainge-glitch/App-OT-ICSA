@@ -34,7 +34,7 @@ function CapacitacionRemoteSignaturePageContent({ params }: { params: Promise<{ 
   useEffect(() => {
     if (!isCapLoading) {
       if (!cap) {
-        setErrorMsg("El registro de capacitación no existe.");
+        setErrorMsg("El registro de la charla no existe.");
         setIsValidating(false);
       } else if (cap.status === 'Completado') {
         setIsSubmitted(true);
@@ -72,7 +72,7 @@ function CapacitacionRemoteSignaturePageContent({ params }: { params: Promise<{ 
       });
 
       if (result.success) {
-        toast({ title: "Firma Exitosa", description: "La capacitación ha sido validada correctamente." });
+        toast({ title: "Firma Exitosa", description: "La charla ha sido validada correctamente." });
         setIsSubmitted(true);
       } else {
         toast({ variant: "destructive", title: "Error", description: result.error });
@@ -116,7 +116,7 @@ function CapacitacionRemoteSignaturePageContent({ params }: { params: Promise<{ 
         </div>
         <div className="space-y-2">
           <h1 className="text-2xl font-black text-primary uppercase">¡Validación Completada!</h1>
-          <p className="text-muted-foreground font-medium">La capacitación ha sido revisada y firmada exitosamente. El registro ya se encuentra actualizado en el sistema.</p>
+          <p className="text-muted-foreground font-medium">La charla ha sido revisada y firmada exitosamente. El registro ya se encuentra actualizado en el sistema.</p>
         </div>
       </div>
     );
@@ -126,7 +126,7 @@ function CapacitacionRemoteSignaturePageContent({ params }: { params: Promise<{ 
     <div className="min-h-screen bg-muted/20 pb-12">
       <header className="bg-primary text-white p-6 sticky top-0 z-50 shadow-lg text-center">
         <h1 className="font-black text-xl uppercase tracking-tighter leading-none">ICSA Gestión Preventiva</h1>
-        <p className="text-xs font-bold opacity-70 uppercase tracking-widest mt-1">Revisión de Capacitación</p>
+        <p className="text-xs font-bold opacity-70 uppercase tracking-widest mt-1">Revisión de Charla</p>
       </header>
 
       <main className="container mx-auto px-4 mt-6 max-w-2xl space-y-6">
@@ -233,7 +233,7 @@ function CapacitacionRemoteSignaturePageContent({ params }: { params: Promise<{ 
               </div>
 
               <p className="text-[10px] text-center text-muted-foreground italic leading-tight px-4">
-                Al firmar este documento, valido que la capacitación se ha realizado conforme a los estándares de seguridad 
+                Al firmar este documento, valido que la charla se ha realizado conforme a los estándares de seguridad 
                 de la empresa y que el registro es fidedigno.
               </p>
             </div>

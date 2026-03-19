@@ -493,9 +493,14 @@ export function HPTForm({ initialData }: { initialData?: any }) {
                     { id: 'solar', label: 'Protector solar' },
                     { id: 'arnesY', label: 'Arnés de Seguridad y Cabo de Vida tipo Y' }
                   ].map((item) => (
-                    <div key={item.id} className="flex items-center space-x-3 p-3 bg-muted/10 rounded-xl hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => setEpp((prev: any) => ({ ...prev, [item.id]: !prev[item.id as keyof typeof epp] }))}>
-                      <Checkbox id={item.id} checked={epp[item.id as keyof typeof epp] as boolean} onCheckedChange={(val) => setEpp((prev: any) => ({ ...prev, [item.id]: val }))} className="h-5 w-5 rounded border-primary/20 data-[state=checked]:bg-primary" />
-                      <Label htmlFor={item.id} className="text-[10px] font-black uppercase tracking-tight cursor-pointer line-clamp-1">{item.label}</Label>
+                    <div key={item.id} className="flex items-center space-x-3 p-3 bg-muted/10 rounded-xl hover:bg-muted/20 transition-colors">
+                      <Checkbox 
+                        id={item.id} 
+                        checked={!!epp[item.id as keyof typeof epp]} 
+                        onCheckedChange={(val) => setEpp((prev: any) => ({ ...prev, [item.id]: !!val }))} 
+                        className="h-5 w-5 rounded border-primary/20 data-[state=checked]:bg-primary" 
+                      />
+                      <Label htmlFor={item.id} className="text-[10px] font-black uppercase tracking-tight cursor-pointer flex-1 py-1">{item.label}</Label>
                     </div>
                   ))}
                 </div>

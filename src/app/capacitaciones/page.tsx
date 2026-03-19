@@ -11,9 +11,9 @@ import { useRouter } from "next/navigation";
 import { useUser, useUserProfile } from "@/lib/auth-provider";
 import { getCapacitaciones, getCapacitacionById } from "@/actions/db-actions";
 import { useActionData } from "@/hooks/use-action-data";
-import { generateCapacitacionPDF } from "@/lib/pdf-generator";
+import { generateCharlaPDF } from "@/lib/pdf-generator";
 
-export default function CapacitacionesListPage() {
+export default function CharlasListPage() {
   const router = useRouter();
   const { user, isUserLoading } = useUser();
   const { userProfile, isProfileLoading } = useUserProfile();
@@ -42,7 +42,7 @@ export default function CapacitacionesListPage() {
     try {
       const fullData = await getCapacitacionById(id);
       if (fullData) {
-        await generateCapacitacionPDF(fullData);
+        await generateCharlaPDF(fullData);
       }
     } catch (e) {
       console.error("Error generating Capacitación PDF:", e);
@@ -50,7 +50,7 @@ export default function CapacitacionesListPage() {
   };
 
   if (isUserLoading || isProfileLoading) {
-    return <div className="min-h-screen flex items-center justify-center font-black animate-pulse text-primary uppercase tracking-tighter">Cargando Capacitaciones...</div>;
+    return <div className="min-h-screen flex items-center justify-center font-black animate-pulse text-primary uppercase tracking-tighter">Cargando Charlas...</div>;
   }
 
   return (
@@ -88,7 +88,7 @@ export default function CapacitacionesListPage() {
         {capLoading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <p className="font-black text-xs uppercase tracking-widest opacity-40">Buscando capacitaciones...</p>
+            <p className="font-black text-xs uppercase tracking-widest opacity-40">Buscando charlas...</p>
           </div>
         ) : filteredCaps.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

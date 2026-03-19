@@ -54,8 +54,8 @@ export default function EditCapacitacionPage() {
               </Button>
             </Link>
             <div className="flex flex-col">
-              <h1 className="font-black text-sm md:text-lg uppercase tracking-tighter leading-tight">Editar Charla</h1>
-              <span className="text-[10px] font-bold opacity-70 uppercase tracking-widest leading-none">Registro de Capacitación de Seguridad</span>
+               <h1 className="font-black text-sm md:text-lg uppercase tracking-tighter leading-tight">Editar Charla</h1>
+              <span className="text-[10px] font-bold opacity-70 uppercase tracking-widest leading-none">Registro de Charla de Seguridad</span>
             </div>
           </div>
         </div>

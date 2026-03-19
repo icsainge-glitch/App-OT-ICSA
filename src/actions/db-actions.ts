@@ -442,7 +442,7 @@ export async function getClientById(id: string) {
 }
 
 export async function deleteRecord(table: string, id: string, userId?: string, isAdmin?: boolean) {
-    const safeTables = ['ordenes', 'historial', 'clients', 'projects', 'personnel', 'users', 'herramientas'];
+    const safeTables = ['ordenes', 'historial', 'clients', 'projects', 'personnel', 'users', 'herramientas', 'hpt', 'capacitaciones'];
     if (!safeTables.includes(table)) throw new Error('Invalid table');
 
     // Security: Only admins can delete clients, personnel, tools, or users permanently
@@ -452,7 +452,7 @@ export async function deleteRecord(table: string, id: string, userId?: string, i
     }
 
     // Soft delete for non-admins on transactional tables
-    if (!isAdmin && userId && ['projects', 'ordenes', 'historial'].includes(table)) {
+    if (!isAdmin && userId && ['projects', 'ordenes', 'historial', 'hpt', 'capacitaciones'].includes(table)) {
         console.log(`[SOFT_DELETE] Hiding record ${id} in table ${table} for user ${userId}`);
         
         // Multi-layered approach: check if hideWorkOrder/hideProject are more appropriate
@@ -983,7 +983,7 @@ export async function submitRemoteSignature(input: any) {
         clientSignatureUrl: input.signatureUrl,
         signatureDate: new Date().toISOString(),
         status: 'Completed',
-        updatedAt: new Date().toISOString()
+        updatedat: new Date().toISOString()
     };
 
     // PostgreSQL handles JSONB directly
@@ -1254,3 +1254,223 @@ export async function clearToolHistory() {
     revalidatePath('/dashboard');
     return { success: true };
 }
+
+// --- HPT MODULE ACTIONS ---
+
+export async function getNextFolioHPT() {
+    try {
+        const { data, error } = await supabase
+            .from('hpt')
+            .select('folio')
+            .order('folio', { ascending: false })
+            .limit(1)
+            .single();
+        
+        return (data?.folio || 0) + 1;
+    } catch (e) {
+        return 1;
+    }
+}
+
+export async function saveHPT(hptData: any, workers: any[]) {
+    try {
+        const hptId = hptData.id || crypto.randomUUID();
+        const payload: any = {};
+        Object.keys(hptData).forEach(key => {
+            payload[key.toLowerCase()] = hptData[key];
+        });
+
+        payload.id = hptId;
+        payload.updatedat = new Date().toISOString();
+
+        if (payload.projectid === "") payload.projectid = null;
+        if (payload.createdby === "") payload.createdby = null;
+
+        const { error: hptError } = await supabase.from('hpt').upsert(payload);
+        if (hptError) throw hptError;
+
+        // Sync workers
+        if (workers && workers.length > 0) {
+            // Delete existing workers to replace
+            await supabase.from('hpt_workers').delete().eq('hpt_id', hptId);
+            
+            const workersPayload = workers.map(w => ({
+                ...w,
+                id: w.id || crypto.randomUUID(),
+                hpt_id: hptId
+            }));
+            
+            const { error: workersError } = await supabase.from('hpt_workers').insert(workersPayload);
+            if (workersError) throw workersError;
+        }
+
+        revalidatePath('/hpt');
+        return { success: true, id: hptId };
+    } catch (e: any) {
+        console.error("Error saving HPT:", e);
+        return { success: false, error: e.message };
+    }
+}
+
+export async function getHPTs(userId?: string, isAdmin?: boolean) {
+    noStore();
+    let query = supabase.from('hpt').select('*').order('createdat', { ascending: false });
+    
+    if (!isAdmin && userId) {
+        query = query.eq('createdby', userId);
+    }
+
+    let { data, error } = await query;
+    if (error) throw error;
+    
+    let result = data || [];
+    if (!isAdmin && userId) {
+        result = result.filter((item: any) => {
+            const hiddenBy = Array.isArray(item.hiddenby) ? item.hiddenby : [];
+            return !hiddenBy.includes(userId);
+        });
+    }
+    return result;
+}
+
+export async function getHPTById(id: string) {
+    noStore();
+    const { data: hpt, error: hptError } = await supabase.from('hpt').select('*').eq('id', id).single();
+    if (hptError) return null;
+
+    const { data: workers, error: workersError } = await supabase.from('hpt_workers').select('*').eq('hpt_id', id);
+    
+    return {
+        ...hpt,
+        workers: workers || []
+    };
+}
+
+// --- CAPACITACION MODULE ACTIONS ---
+
+export async function getNextFolioCapacitacion() {
+    try {
+        const { data, error } = await supabase
+            .from('capacitaciones')
+            .select('folio')
+            .order('folio', { ascending: false })
+            .limit(1)
+            .single();
+        
+        return (data?.folio || 0) + 1;
+    } catch (e) {
+        return 1;
+    }
+}
+
+export async function saveCapacitacion(capData: any, assistants: any[]) {
+    try {
+        const capId = capData.id || crypto.randomUUID();
+        const payload: any = {};
+        Object.keys(capData).forEach(key => {
+            payload[key.toLowerCase()] = capData[key];
+        });
+        
+        payload.id = capId;
+        payload.updatedat = new Date().toISOString();
+
+        if (payload.createdby === "") payload.createdby = null;
+
+        const { error: capError } = await supabase.from('capacitaciones').upsert(payload);
+        if (capError) throw capError;
+
+        // Sync assistants
+        if (assistants && assistants.length > 0) {
+            await supabase.from('capacitacion_asistentes').delete().eq('capacitacion_id', capId);
+            
+            const asisPayload = assistants.map(a => ({
+                ...a,
+                id: a.id || crypto.randomUUID(),
+                capacitacion_id: capId
+            }));
+            
+            const { error: asisError } = await supabase.from('capacitacion_asistentes').insert(asisPayload);
+            if (asisError) throw asisError;
+        }
+
+        revalidatePath('/capacitaciones');
+        return { success: true, id: capId };
+    } catch (e: any) {
+        console.error("Error saving Capacitacion:", e);
+        return { success: false, error: e.message };
+    }
+}
+
+export async function getCapacitaciones(userId?: string, isAdmin?: boolean) {
+    noStore();
+    let query = supabase.from('capacitaciones').select('*').order('createdat', { ascending: false });
+    
+    if (!isAdmin && userId) {
+        query = query.eq('createdby', userId);
+    }
+
+    let { data, error } = await query;
+    if (error) throw error;
+    
+    let result = data || [];
+    if (!isAdmin && userId) {
+        result = result.filter((item: any) => {
+            const hiddenBy = Array.isArray(item.hiddenby) ? item.hiddenby : [];
+            return !hiddenBy.includes(userId);
+        });
+    }
+    return result;
+}
+
+export async function getCapacitacionById(id: string) {
+    noStore();
+    const { data: cap, error: capError } = await supabase.from('capacitaciones').select('*').eq('id', id).single();
+    if (capError) return null;
+
+    const { data: assistants, error: asisError } = await supabase.from('capacitacion_asistentes').select('*').eq('capacitacion_id', id);
+    
+    return {
+        ...cap,
+        assistants: assistants || []
+    };
+}
+
+export async function submitCapacitacionRemoteSignature(input: {
+    id: string;
+    token: string;
+    prevencionName: string;
+    prevencionSignatureUrl: string;
+}) {
+    try {
+        const cap = await getCapacitacionById(input.id);
+        if (!cap) return { success: false, error: 'La capacitación no existe.' };
+
+        if (cap.signature_token !== input.token) return { success: false, error: 'Token no válido.' };
+
+        if (cap.token_expiry && new Date(cap.token_expiry) < new Date()) {
+            return { success: false, error: 'Enlace expirado.' };
+        }
+
+        const updatedData = {
+            ...cap,
+            prevencion_signature_url: input.prevencionSignatureUrl,
+            prevencion_signature_date: new Date().toISOString(),
+            status: 'Completado',
+            updatedat: new Date().toISOString()
+        };
+
+        const { assistants, ...capWithoutAssistants } = updatedData;
+
+        const { error } = await supabase.from('capacitaciones').upsert(capWithoutAssistants);
+        if (error) throw error;
+
+        revalidatePath('/capacitaciones');
+        revalidatePath(`/capacitaciones/${input.id}`);
+
+        return { success: true };
+    } catch (e: any) {
+        console.error("Error submitting remote signature for capacitacion:", e);
+        return { success: false, error: e.message };
+    }
+}
+

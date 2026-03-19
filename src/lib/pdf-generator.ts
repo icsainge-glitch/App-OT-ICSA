@@ -708,3 +708,445 @@ export const generateBatchReturnActPDF = async (movements: any[]) => {
   const filePrefix = isAssignment ? 'Acta_Salida' : 'Acta_Devolucion';
   doc.save(`${filePrefix}_${responsible.replace(/\s+/g, '_')}_${batchIdShort}.pdf`);
 };
+
+// --- HPT PDF GENERATOR ---
+export const generateHPTPDF = async (data: any) => {
+  const doc = new jsPDF();
+  const primaryColor: [number, number, number] = [56, 163, 165];
+  const darkGray: [number, number, number] = [40, 40, 40];
+  const margin = 10;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  let logoBase64 = "";
+
+  try { logoBase64 = await toDataURL(LOGO_URL); } catch (e) { }
+
+  const drawHeader = (page: number) => {
+    if (logoBase64) doc.addImage(logoBase64, "PNG", margin, 10, 40, 15);
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.1);
+    doc.rect(margin, 10, pageWidth - margin * 2, 15);
+    doc.line(55, 10, 55, 25);
+    doc.line(pageWidth - 50, 10, pageWidth - 50, 25);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("HOJA DE PLANIFICACIÓN DEL TRABAJO (HPT)", 125, 18, { align: "center" });
+    
+    doc.setFontSize(7);
+    doc.text("ICSA-SSOC-002 HPT", pageWidth - 12, 13, { align: "right" });
+    doc.text("Ver 1.0 2026", pageWidth - 12, 18, { align: "right" });
+    doc.text(`Página ${page} de 2`, pageWidth - 12, 23, { align: "right" });
+  };
+
+  // --- PAGE 1 ---
+  drawHeader(1);
+  let currentY = 25;
+
+  // General Info Table
+  autoTable(doc, {
+    startY: currentY,
+    body: [
+      ['Proyecto', data.projectName || 'General / Sin Proyecto'],
+      ['Supervisor a cargo:', data.supervisorName || 'N/A', 'FIRMA', ''],
+      ['Rut', data.supervisorRut || 'N/A', '', ''],
+      ['Fecha:', new Date(data.fecha).toLocaleDateString('es-CL'), '', '']
+    ],
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 2 },
+    columnStyles: { 
+      0: { cellWidth: 35, fontStyle: 'bold', fillColor: [240, 240, 240] },
+      1: { cellWidth: 80 },
+      2: { cellWidth: 25, fontStyle: 'bold', halign: 'center', fillColor: [240, 240, 240] },
+      3: { cellWidth: 50 }
+    },
+    didDrawCell: (cellData) => {
+       if (cellData.section === 'body' && cellData.column.index === 3 && cellData.row.index === 1) {
+         if (data.firmaSupervisor) {
+           try { doc.addImage(data.firmaSupervisor, 'PNG', cellData.cell.x + 5, cellData.cell.y + 1, 40, 10); } catch(e){}
+         }
+       }
+    }
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY;
+
+  // Team Table
+  autoTable(doc, {
+    startY: currentY,
+    head: [['EQUIPO DE TRABAJO', { content: 'FIRMAS', colSpan: 1 }]],
+    headStyles: { fillColor: [80, 80, 80], halign: 'center', fontSize: 8 },
+    theme: 'grid'
+  });
+  
+  const workerRows = [];
+  for(let i=0; i<6; i++) {
+    const w = data.workers?.[i];
+    workerRows.push([
+      `Nombre Trabajador: ${w?.nombre || ''}`,
+      `RUT: ${w?.rut || ''}`,
+      `Cargo: ${w?.cargo || ''}`,
+      ''
+    ]);
+  }
+
+  autoTable(doc, {
+    startY: (doc as any).lastAutoTable.finalY,
+    body: workerRows,
+    theme: 'grid',
+    styles: { fontSize: 7, cellPadding: 1, minCellHeight: 8 },
+    columnStyles: { 0: { cellWidth: 50 }, 1: { cellWidth: 40 }, 2: { cellWidth: 40 }, 3: { cellWidth: 60 } },
+    didDrawCell: (cellData) => {
+      if (cellData.section === 'body' && cellData.column.index === 3) {
+        const w = data.workers?.[cellData.row.index];
+        if (w?.firma) {
+          try { doc.addImage(w.firma, 'PNG', cellData.cell.x + 10, cellData.cell.y + 1, 40, 6); } catch(e){}
+        }
+      }
+    }
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY;
+
+  // Resources Table
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setFillColor(80, 80, 80);
+  doc.setTextColor(255, 255, 255);
+  doc.rect(margin, currentY, pageWidth - margin * 2, 6, 'F');
+  doc.text("RECURSOS / COORDINACIÓN / PERMISOS (SI es NO, corregir el estado del item antes de iniciar la tarea)", margin + 2, currentY + 4);
+  currentY += 6;
+
+  const resData = [
+    { id: 'personal', n: '1', label: '¿Se cuenta con el personal necesario y entrenado según el procedimiento de trabajo ICSA?' },
+    { id: 'equipos', n: '2', label: '¿Se cuenta con los Equipos, Herramientas necesarias, y estos se encuentran en buen estado de uso?' },
+    { id: 'materiales', n: '3', label: '¿Se dispone de los materiales, repuestos e insumos necesarios?' },
+    { id: 'coordinacionC', n: '4', label: '¿Se realizó coordinaciones necesarias con cliente para acceder a las zonas de trabajo?' },
+    { id: 'bloqueo', n: '5', label: '¿Se coordinó bloqueo de seguridad y/o líneas (Eléctricas, Hidráulicas, etc.)?' },
+    { id: 'permisoC', n: '6', label: '¿Se solicitó el permiso de ingreso al personal de prevención de riesgos cliente?' }
+  ];
+
+  const resRows = [];
+  for(let i=0; i<3; i++) {
+    const left = resData[i];
+    const right = resData[i+3];
+    const getSNN = (obj: any, id: string) => {
+      const val = obj?.[id];
+      return [val === 'SI' ? 'X' : '', val === 'NO' ? 'X' : '', val === 'N/A' ? 'X' : ''];
+    };
+    const lSNN = getSNN(data.recursos, left.id);
+    const rSNN = getSNN(data.recursos, right.id);
+
+    resRows.push([
+      left.n, left.label, ...lSNN, 
+      right.n, right.label, ...rSNN
+    ]);
+  }
+
+  autoTable(doc, {
+    startY: currentY,
+    head: [['N°', 'ITEM', 'SI', 'NO', 'N/A', 'N°', 'ITEM', 'SI', 'NO', 'N/A']],
+    body: resRows,
+    theme: 'grid',
+    styles: { fontSize: 6, cellPadding: 1 },
+    headStyles: { fillColor: [240, 240, 240], textColor: 0, halign: 'center' },
+    columnStyles: { 
+      0: { cellWidth: 5 }, 1: { cellWidth: 60 }, 2: { cellWidth: 10, halign: 'center' }, 3: { cellWidth: 10, halign: 'center' }, 4: { cellWidth: 10, halign: 'center' },
+      5: { cellWidth: 5 }, 6: { cellWidth: 60 }, 7: { cellWidth: 10, halign: 'center' }, 8: { cellWidth: 10, halign: 'center' }, 9: { cellWidth: 10, halign: 'center' }
+    }
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY;
+
+  // Work Description
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setFillColor(80, 80, 80);
+  doc.setTextColor(255, 255, 255);
+  doc.rect(margin, currentY, pageWidth - margin * 2, 6, 'F');
+  doc.text("TRABAJO A REALIZAR ¿ Cómo Ejecutaré Mi trabajo?", margin + 2, currentY + 4);
+  currentY += 6;
+
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.1);
+  doc.setTextColor(0);
+  doc.setFont("helvetica", "normal");
+  const splitJob = doc.splitTextToSize(data.trabajoRealizar || '', pageWidth - margin * 2 - 4);
+  doc.rect(margin, currentY, pageWidth - margin * 2, 40);
+  doc.text(splitJob, margin + 2, currentY + 5);
+
+  // --- PAGE 2 ---
+  doc.addPage();
+  drawHeader(2);
+  currentY = 25;
+
+  // Risks Table
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setFillColor(80, 80, 80);
+  doc.setTextColor(255, 255, 255);
+  doc.rect(margin, currentY, pageWidth - margin * 2, 6, 'F');
+  doc.text("IDENTIFICACIÓN DE ACCIDENTES POTENCIALES O RIESGOS ASOCIADOS ¿ Qué me puede ocurrir, estoy expuesto, SI o NO?", margin + 2, currentY + 4);
+  currentY += 6;
+
+  const riskItems = [
+    { id: 'aprisionamiento', n: '1', label: 'Aprisionamiento. Tableros, máquinas o equipos en movimiento...' },
+    { id: 'atrapamiento', n: '2', label: 'Atrapamiento de o parte de todo el cuerpo por objetos...' },
+    { id: 'caidaMismo', n: '3', label: 'Caída al mismo nivel. Ej: caminar en áreas con agua, hielo...' },
+    { id: 'caidaDistinto', n: '4', label: 'Caída a distinto nivel. Ej: caídas desde Caballetes, andamios...' },
+    { id: 'energiaE', n: '5', label: 'Contacto con energía eléctrica. Ej: comando, tableros generales...' },
+    { id: 'fluidosP', n: '6', label: 'Contacto con fluidos a presión. Ej: agua, aire, gases, vapor, etc' },
+    { id: 'sustanciasT', n: '7', label: 'Contacto con sust. Tóxicas. Ej: Cloro, Flúor, Ácido Sulfúrico...' },
+    { id: 'temperaturas', n: '8', label: 'Contacto con Temperaturas Extremas. Ej: calor o frío...' },
+    { id: 'estadoP', n: '9', label: 'Estado Personal, Estoy en buenas condic. Físicas y Psicológicas...' },
+    { id: 'radiacion', n: '10', label: 'Exposición a. Ej: Radiación Ultravioleta, ruidos, gases...' },
+    { id: 'golpeadoC', n: '11', label: 'Golpeado con o Contra Herramientas. Objeto, estructuras...' },
+    { id: 'golpeadoO', n: '12', label: 'Golpeado por objetos en mov. Ej: camión grúa, caída de materiales...' },
+    { id: 'atropellado', n: '13', label: 'Atropellado Por Vehículo, Maquinaria u Equipo en Movimiento.' },
+    { id: 'inmersion', n: '14', label: 'Por Inmersión (asfixia). Ej: Ingreso al agua, recintos cerrados...' },
+    { id: 'sobreesfuerzo', n: '15', label: 'Sobreesfuerzo. Ej: levantar carga sin ayuda o equipos de levante.' },
+    { id: 'cargasS', n: '16', label: 'Cargas Suspendidas. Ej: exposición bajo cargas.' },
+    { id: 'incendioE', n: '17', label: 'Incendios, Explosión, Derrames, Choques, Volcamientos, etc.' },
+    { id: 'otros', n: '18', label: 'Otros: Supervisor debe llenar este item solo si aplica' }
+  ];
+
+  const riskRows = [];
+  for(let i=0; i<9; i++) {
+    const left = riskItems[i];
+    const right = riskItems[i+9];
+    const getSNN = (obj: any, id: string) => {
+      const val = obj?.[id];
+      return [val === 'SI' ? 'X' : '', val === 'NO' ? 'X' : '', val === 'N/A' ? 'X' : ''];
+    };
+    riskRows.push([
+      left.n, left.label, ...getSNN(data.riesgos, left.id),
+      right.n, right.label, ...getSNN(data.riesgos, right.id)
+    ]);
+  }
+
+  autoTable(doc, {
+    startY: currentY,
+    head: [['N°', 'IDENTIFICACIÓN', 'SI', 'NO', 'N/A', 'N°', 'IDENTIFICACIÓN', 'SI', 'NO', 'N/A']],
+    body: riskRows,
+    theme: 'grid',
+    styles: { fontSize: 5.5, cellPadding: 0.8 },
+    headStyles: { fillColor: [240, 240, 240], textColor: 0, halign: 'center' },
+    columnStyles: { 
+      0: { cellWidth: 5 }, 1: { cellWidth: 60 }, 2: { cellWidth: 8, halign: 'center' }, 3: { cellWidth: 8, halign: 'center' }, 4: { cellWidth: 8, halign: 'center' },
+      5: { cellWidth: 5 }, 6: { cellWidth: 60 }, 7: { cellWidth: 8, halign: 'center' }, 8: { cellWidth: 8, halign: 'center' }, 9: { cellWidth: 8, halign: 'center' }
+    }
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY;
+
+  // Measures Table
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setFillColor(80, 80, 80);
+  doc.setTextColor(255, 255, 255);
+  doc.rect(margin, currentY, pageWidth - margin * 2, 6, 'F');
+  doc.text("IDENTIFICACIÓN DE LAS MEDIDAS DE SEGURIDAD", margin + 2, currentY + 4);
+  currentY += 6;
+
+  const measureItems = [
+    { id: 'limpiesa', n: '1', label: 'El área de trabajo está limpia, ordenada y con accesos expeditos.' },
+    { id: 'iluminacion', n: '2', label: 'El área dispone de la iluminación requerida para la tarea a realizar.' },
+    { id: 'ventilacion', n: '3', label: 'El área de trabajo dispone de la ventilación requerida para la tarea.' },
+    { id: 'electricas', n: '4', label: 'Las instalaciones eléctricas portátiles se encuentran en buen estado.' },
+    { id: 'superficies', n: '5', label: 'Las superficies de trabajo se encuentran en buenas condiciones.' },
+    { id: 'delimitada', n: '6', label: 'Está delimitada la zona la zona de bloqueo y movimientos de equipos.' },
+    { id: 'controlL', n: '7', label: 'Se verifica el control local de los bloqueos del o los equipos...' },
+    { id: 'enclavamiento', n: '8', label: 'Se verifica el enclavamiento mecánico de andamios, andamio escala...' },
+    { id: 'eppAdecuado', n: '9', label: 'Se verifica la utilización de los EPP adecuados y en buen estado.' },
+    { id: 'arnes', n: '10', label: 'Se utilizan arnés de seguridad sobre 1,5 mt.' },
+    { id: 'fueraCarga', n: '11', label: 'Los trabajadores se ubican fuera del área de carga suspendida...' },
+    { id: 'izajes', n: '12', label: 'Se utilizan equipos de izajes y de traslado de materiales en buen estado.' },
+    { id: 'evitarIncendio', n: '13', label: 'Se implementan medidas para evitar un incendio en el área.' },
+    { id: 'zonaSeguridad', label: '14. El área cuenta con zona de seguridad en caso de emergencias.' }
+  ];
+
+  const measureRows = [];
+  for(let i=0; i<7; i++) {
+    const left = measureItems[i];
+    const right = measureItems[i+7];
+    const getSNN = (obj: any, id: string) => {
+      const val = obj?.[id];
+      return [val === 'SI' ? 'X' : '', val === 'NO' ? 'X' : '', val === 'N/A' ? 'X' : ''];
+    };
+    measureRows.push([
+      left.n || '', left.label, ...getSNN(data.medidas, left.id),
+      right.n || (i+8).toString(), right.label, ...getSNN(data.medidas, right.id)
+    ]);
+  }
+
+  autoTable(doc, {
+    startY: currentY,
+    head: [['N°', 'IDENTIFICACIÓN', 'SI', 'NO', 'N/A', 'N°', 'IDENTIFICACIÓN', 'SI', 'NO', 'N/A']],
+    body: measureRows,
+    theme: 'grid',
+    styles: { fontSize: 5.5, cellPadding: 1 },
+    headStyles: { fillColor: [240, 240, 240], textColor: 0, halign: 'center' },
+    columnStyles: { 
+      0: { cellWidth: 5 }, 1: { cellWidth: 60 }, 2: { cellWidth: 8, halign: 'center' }, 3: { cellWidth: 8, halign: 'center' }, 4: { cellWidth: 8, halign: 'center' },
+      5: { cellWidth: 5 }, 6: { cellWidth: 60 }, 7: { cellWidth: 8, halign: 'center' }, 8: { cellWidth: 8, halign: 'center' }, 9: { cellWidth: 8, halign: 'center' }
+    }
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY;
+
+  // EPP Table
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setFillColor(80, 80, 80);
+  doc.setTextColor(255, 255, 255);
+  doc.rect(margin, currentY, pageWidth - margin * 2, 6, 'F');
+  doc.text("EQUIPOS DE PROTECCIÓN Y ELEMENTOS DE SEGURIDAD REQUERIDOS PARA LA TAREA", margin + 2, currentY + 4);
+  currentY += 6;
+
+  const eppItems = [
+    { id: 'casco', label: 'Casco de Seguridad' },
+    { id: 'lentes', label: 'Lentes de Seguridad' },
+    { id: 'calzado', label: 'Calzado de Seguridad' },
+    { id: 'respiratorio', label: 'Protector Respiratorio' },
+    { id: 'careta', label: 'Careta Facial' },
+    { id: 'guantes', label: 'Guantes de seguridad' },
+    { id: 'legionario', label: 'Legionario' },
+    { id: 'barbiquejo', label: 'Barbiquejo' },
+    { id: 'auditivo', label: 'Protector Auditivo' },
+    { id: 'soldar', label: 'Máscara soldar' },
+    { id: 'solar', label: 'Protector solar' },
+    { id: 'arnesY', label: 'Arnés Seguridad y Cabo de Vida tipo Y' }
+  ];
+
+  const eppRows = [];
+  for(let i=0; i<3; i++) {
+    const r = [];
+    for(let j=0; j<4; j++) {
+      const item = eppItems[i + j*3];
+      if(item) {
+        r.push(data.epp?.[item.id] ? '[X]' : '[ ]');
+        r.push(item.label);
+      } else {
+        r.push(''); r.push('');
+      }
+    }
+    eppRows.push(r);
+  }
+
+  autoTable(doc, {
+    startY: currentY,
+    body: eppRows,
+    theme: 'grid',
+    styles: { fontSize: 6, cellPadding: 1 },
+    columnStyles: { 
+      0: { cellWidth: 8, halign: 'center' }, 1: { cellWidth: 35 },
+      2: { cellWidth: 8, halign: 'center' }, 3: { cellWidth: 35 },
+      4: { cellWidth: 8, halign: 'center' }, 5: { cellWidth: 35 },
+      6: { cellWidth: 8, halign: 'center' }, 7: { cellWidth: 35 }
+    }
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY;
+  doc.setFontSize(7);
+  doc.setTextColor(0);
+  doc.text(`Otros: ${data.epp?.otros || ''}`, margin + 2, currentY + 5);
+
+  doc.save(`HPT-${data.folio}-${new Date(data.fecha).toISOString().split('T')[0]}.pdf`);
+};
+
+// --- CAPACITACION PDF GENERATOR ---
+export const generateCapacitacionPDF = async (data: any) => {
+  const doc = new jsPDF();
+  const primaryColor: [number, number, number] = [56, 163, 165];
+  const darkGray: [number, number, number] = [40, 40, 40];
+  const margin = 15;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  let logoBase64 = "";
+
+  try { logoBase64 = await toDataURL(LOGO_URL); } catch (e) { }
+
+  // Header
+  if (logoBase64) doc.addImage(logoBase64, "PNG", margin, 10, 45, 18);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text("REGISTRO DE CAPACITACIÓN / CHARLA", pageWidth - margin, 20, { align: "right" });
+  
+  doc.setFontSize(10);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text(`Folio: ${formatFolio(data.folio)}`, pageWidth - margin, 28, { align: "right" });
+
+  let currentY = 45;
+
+  autoTable(doc, {
+    startY: currentY,
+    head: [['DATOS DE LA CAPACITACIÓN']],
+    body: [
+      [`Relator: ${data.supervisorName || 'N/A'} | Cargo: ${data.cargo || 'N/A'}`],
+      [`Lugar: ${data.lugar || 'N/A'} | Fecha: ${new Date(data.fecha).toLocaleDateString('es-CL')}`],
+      [`Hora Inicio: ${data.horaInicio || 'N/A'} | Hora Término: ${data.horaTermino || 'N/A'}`]
+    ],
+    theme: 'grid',
+    headStyles: { fillColor: primaryColor, textColor: [255, 255, 255] }
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 8;
+  doc.setFont("helvetica", "bold");
+  doc.text("TEMARIO / CONTENIDO", margin, currentY);
+  currentY += 4;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  const splitTemario = doc.splitTextToSize(data.temario || '', pageWidth - margin * 2);
+  doc.text(splitTemario, margin, currentY);
+  currentY += (splitTemario.length * 5) + 8;
+
+  // Assistants Table
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("LISTA DE ASISTENTES", margin, currentY);
+  currentY += 4;
+
+  if (data.assistants && data.assistants.length > 0) {
+    autoTable(doc, {
+      startY: currentY,
+      head: [['Nombre Asistente', 'RUT', 'Cargo / Empresa', 'Firma']],
+      body: data.assistants.map((a: any) => [a.nombre, a.rut, a.cargo, '']),
+      theme: 'grid',
+      headStyles: { fillColor: [100, 100, 100], textColor: [255, 255, 255] },
+      bodyStyles: { minCellHeight: 18, valign: 'middle', fontSize: 8 },
+      didDrawCell: (cellData) => {
+        if (cellData.section === 'body' && cellData.column.index === 3) {
+          const assistant = data.assistants[cellData.row.index];
+          if (assistant.firma) {
+            try { doc.addImage(assistant.firma, 'PNG', cellData.cell.x + 2, cellData.cell.y + 2, 25, 12); } catch (e) { }
+          }
+        }
+      }
+    });
+    currentY = (doc as any).lastAutoTable.finalY + 15;
+  }
+
+  // Final Signatures
+  if (currentY > pageHeight - 60) { doc.addPage(); currentY = 40; }
+  doc.setDrawColor(200, 200, 200);
+  
+  // Left: Supervisor/Relator
+  doc.line(margin, currentY, margin + 60, currentY);
+  doc.text("FIRMA RESPONSABLE", margin, currentY + 5);
+  doc.text(data.supervisorName || '', margin, currentY + 10);
+  if (data.firmaSupervisor) {
+    try { doc.addImage(data.firmaSupervisor, 'PNG', margin, currentY - 20, 40, 18); } catch (e) { }
+  }
+
+  // Right: Prevención (if signed)
+  if (data.prevencion_signature_url) {
+    const rightX = pageWidth - margin - 60;
+    doc.line(rightX, currentY, pageWidth - margin, currentY);
+    doc.text("FIRMA PREVENCIÓN", rightX, currentY + 5);
+    doc.text(data.prevencionName || 'Departamento de Prevención', rightX, currentY + 10);
+    try { doc.addImage(data.prevencion_signature_url, 'PNG', rightX, currentY - 20, 40, 18); } catch (e) { }
+  }
+
+
+  doc.save(`Capacitacion-${formatFolio(data.folio)}-${new Date().toISOString().split('T')[0]}.pdf`);
+};

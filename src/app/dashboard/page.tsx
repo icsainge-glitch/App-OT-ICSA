@@ -298,7 +298,9 @@ function DashboardContent() {
           { id: "orders", icon: ClipboardList, label: "Órdenes Activas" },
           { id: "order-history", icon: History, label: "Historial Órdenes" },
           { id: "tools", icon: Wrench, label: "Control Herramientas" },
-          { id: "tool-history", icon: FileText, label: "Actas Herramientas" }
+          { id: "tool-history", icon: FileText, label: "Actas Herramientas" },
+          { id: "hpt", icon: FileText, label: "HPT (Seguridad)" },
+          { id: "capacitaciones", icon: BookOpen, label: "Capacitaciones" }
         ].map((item) => (
           <Button
             key={item.id}
@@ -307,7 +309,13 @@ function DashboardContent() {
               "w-full justify-start gap-3 h-12 rounded-xl font-bold text-sm transition-all text-left",
               activeTab === item.id ? "bg-white text-primary shadow-md" : "text-white/70 hover:bg-white/10 hover:text-white"
             )}
-            onClick={() => { setTab(item.id); setSearchTerm(""); setIsMobileMenuOpen(false); }}
+            onClick={() => { 
+              if (item.id === 'hpt') { router.push('/hpt'); return; }
+              if (item.id === 'capacitaciones') { router.push('/capacitaciones'); return; }
+              setTab(item.id); 
+              setSearchTerm(""); 
+              setIsMobileMenuOpen(false); 
+            }}
           >
             <item.icon size={20} className="shrink-0" /> <span className="truncate">{item.label}</span>
           </Button>
@@ -456,6 +464,16 @@ function DashboardContent() {
               <Link href="/work-orders/new">
                 <Button className="bg-accent hover:bg-accent/90 text-primary font-black rounded-2xl h-11 px-6 shadow-[0_8px_20px_rgba(var(--accent),0.3)] transition-all hover:-translate-y-0.5 active:scale-95">
                   <Plus size={18} className="mr-2" /> Crear OT
+                </Button>
+              </Link>
+              <Link href="/hpt/new">
+                <Button className="hidden lg:flex bg-slate-800 hover:bg-slate-900 text-white font-black rounded-2xl h-11 px-6 shadow-[0_8px_20px_rgba(0,0,0,0.1)] transition-all hover:-translate-y-0.5 active:scale-95">
+                  <Plus size={18} className="mr-2" /> Nuevo HPT
+                </Button>
+              </Link>
+              <Link href="/capacitaciones/new">
+                <Button className="hidden lg:flex bg-slate-800 hover:bg-slate-900 text-white font-black rounded-2xl h-11 px-6 shadow-[0_8px_20px_rgba(0,0,0,0.1)] transition-all hover:-translate-y-0.5 active:scale-95">
+                  <Plus size={18} className="mr-2" /> Nueva Charla
                 </Button>
               </Link>
             </div>

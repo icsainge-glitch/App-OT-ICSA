@@ -43,6 +43,14 @@ async function createAdmin() {
   const id = user.id
   console.log(`ID del usuario en Auth: ${id}`)
 
+  // 2.5 Force update password to ensure it's admin123
+  console.log(`Forzando password a ${password}...`)
+  const { error: updateError } = await supabase.auth.admin.updateUserById(id, {
+    password: password
+  })
+  if (updateError) console.error('Error al actualizar password:', updateError.message)
+  else console.log('Password actualizado correctamente.')
+
   // 4. Try to SELECT
   console.log('Intentando leer de la tabla "users"...')
   const { data: testRead, error: readError } = await supabase.from('users').select('*').limit(1)

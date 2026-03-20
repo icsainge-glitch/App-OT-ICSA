@@ -147,7 +147,7 @@ export async function getNextFolio() {
 
 export async function getActiveProjects(userId?: string, isAdmin?: boolean, includeCompleted: boolean = false) {
     noStore();
-    let query = supabase.from('projects').select('*').order('updatedAt', { ascending: false });
+    let query = supabase.from('projects').select('*').order('updatedat', { ascending: false });
 
     if (!includeCompleted) {
         query = query.eq('status', 'Active');
@@ -169,13 +169,13 @@ export async function getActiveProjects(userId?: string, isAdmin?: boolean, incl
         // If Supabase returns an error instead of throwing (typical for 22P02)
         if (error && (error.code === '22P02' || error.message?.includes('invalid input syntax'))) {
             console.warn("[GET_ACTIVE_PROJECTS_WARN] Filter failed, applying fallback...", error);
-            const fallback = await supabase.from('projects').select('*').order('updatedAt', { ascending: false });
+            const fallback = await supabase.from('projects').select('*').order('updatedat', { ascending: false });
             data = fallback.data;
             error = fallback.error;
         }
     } catch (e: any) {
         console.error("[GET_ACTIVE_PROJECTS_EXCEPTION]", e);
-        const fallback = await supabase.from('projects').select('*').order('updatedAt', { ascending: false });
+        const fallback = await supabase.from('projects').select('*').order('updatedat', { ascending: false });
         data = fallback.data;
         error = fallback.error;
     }
@@ -349,14 +349,14 @@ export async function getWorkOrders(userId?: string, isAdmin?: boolean) {
         .from('ordenes')
         .select('*')
         .not('status', 'in', '("Completed", "Completado")')
-        .order('updatedAt', { ascending: false });
+        .order('updatedat', { ascending: false });
 
     if (!isAdmin) {
-        query = query.or('projectId.is.null,projectId.eq.""');
+        query = query.or('projectid.is.null,projectid.eq.""');
     }
 
     if (!isAdmin && userId) {
-        query = query.contains('teamIds', [userId]);
+        query = query.contains('teamids', [userId]);
     }
 
     let data, error;
@@ -370,7 +370,7 @@ export async function getWorkOrders(userId?: string, isAdmin?: boolean) {
             const fallback = await supabase.from('ordenes')
                 .select('*')
                 .not('status', 'in', '("Completed", "Completado")')
-                .order('updatedAt', { ascending: false });
+                .order('updatedat', { ascending: false });
             data = fallback.data;
             error = fallback.error;
         }
@@ -379,7 +379,7 @@ export async function getWorkOrders(userId?: string, isAdmin?: boolean) {
         const fallback = await supabase.from('ordenes')
             .select('*')
             .not('status', 'in', '("Completed", "Completado")')
-            .order('updatedAt', { ascending: false });
+            .order('updatedat', { ascending: false });
         data = fallback.data;
         error = fallback.error;
     }
@@ -417,14 +417,14 @@ export async function getArchivedWorkOrders(userId?: string, isAdmin?: boolean) 
     let query = supabase
         .from('historial')
         .select('*')
-        .order('updatedAt', { ascending: false });
+        .order('updatedat', { ascending: false });
 
     if (!isAdmin) {
-        query = query.or('projectId.is.null,projectId.eq.""');
+        query = query.or('projectid.is.null,projectid.eq.""');
     }
 
     if (!isAdmin && userId) {
-        query = query.contains('teamIds', [userId]);
+        query = query.contains('teamids', [userId]);
     }
 
     let data, error;
@@ -437,7 +437,7 @@ export async function getArchivedWorkOrders(userId?: string, isAdmin?: boolean) 
             console.warn("[GET_ARCHIVED_WORK_ORDERS_WARN] Filter failed, applying fallback...", error);
             const fallback = await supabase.from('historial')
                 .select('*')
-                .order('updatedAt', { ascending: false });
+                .order('updatedat', { ascending: false });
             data = fallback.data;
             error = fallback.error;
         }
@@ -445,7 +445,7 @@ export async function getArchivedWorkOrders(userId?: string, isAdmin?: boolean) 
         console.error("[GET_ARCHIVED_WORK_ORDERS_EXCEPTION]", e);
         const fallback = await supabase.from('historial')
             .select('*')
-            .order('updatedAt', { ascending: false });
+            .order('updatedat', { ascending: false });
         data = fallback.data;
         error = fallback.error;
     }
@@ -504,7 +504,7 @@ export async function getToolsByResponsible(responsibleName: string) {
     const { data, error } = await supabase
         .from('herramientas')
         .select('*')
-        .eq('asignadoA', responsibleName)
+        .eq('asignadoa', responsibleName)
         .order('nombre', { ascending: true });
     
     if (error) throw error;
@@ -790,7 +790,7 @@ export async function getProjectOrders(projectId: string, userId?: string, isAdm
     let query = supabase
         .from('ordenes')
         .select('*')
-        .eq('projectId', projectId)
+        .eq('projectid', projectId) // lowercase
         .not('status', 'in', '("Completed", "Completado")')
         .order('updatedat', { ascending: false }); // lowercase DB
 
@@ -815,7 +815,7 @@ export async function getProjectArchivedOrders(projectId: string, userId?: strin
     let query = supabase
         .from('historial')
         .select('*')
-        .eq('projectId', projectId)
+        .eq('projectid', projectId) // lowercase
         .order('updatedat', { ascending: false }); // lowercase DB
 
     const { data, error } = await query;
@@ -991,7 +991,7 @@ export async function closeProject(
     }
 
     // Move active orders to history
-    const { data: activeOrders } = await supabase.from('ordenes').select('*').eq('projectId', projectId);
+    const { data: activeOrders } = await supabase.from('ordenes').select('*').eq('projectid', projectId);
     
     if (activeOrders) {
         for (const order of activeOrders) {
@@ -1188,7 +1188,7 @@ export async function saveTool(data: any, signatureUrl?: string) {
                 const { data: lastAssignment } = await supabase
                     .from('tool_movements')
                     .select('timestamp')
-                    .eq('toolId', data.id)
+                    .eq('toolid', data.id)
                     .eq('action', 'Asignación')
                     .order('timestamp', { ascending: false })
                     .limit(1)
@@ -1233,7 +1233,7 @@ export async function approveToolReturn(toolId: string) {
     const { data: lastReturn } = await supabase
         .from('tool_movements')
         .select('id')
-        .eq('toolId', toolId)
+        .eq('toolid', toolId)
         .eq('action', 'Devolución')
         .eq('status', 'Pendiente')
         .order('timestamp', { ascending: false })
@@ -1245,7 +1245,7 @@ export async function approveToolReturn(toolId: string) {
     }
 
     await supabase.from('herramientas')
-        .update({ estado: 'Disponible', asignadoA: '' })
+        .update({ estado: 'Disponible', asignadoa: '' })
         .eq('id', toolId);
 
     revalidatePath('/dashboard');
@@ -1263,9 +1263,9 @@ export async function returnMultipleTools(toolIds: string[], comment: string, as
         // Update Tool
         await supabase.from('herramientas').update({
             estado: 'Disponible',
-            asignadoA: '',
-            lastReturnDate: timestamp,
-            updatedAt: timestamp,
+            asignadoa: '',
+            lastreturndate: timestamp,
+            updatedat: timestamp,
             // Simple append for notes in Supabase
             notas: `${comment}\n---\n${tool?.notas || ''}`
         }).eq('id', id);
@@ -1273,7 +1273,7 @@ export async function returnMultipleTools(toolIds: string[], comment: string, as
         // Fetch last assignment
         const { data: assign } = await supabase.from('tool_movements')
             .select('timestamp')
-            .eq('toolId', id)
+            .eq('toolid', id)
             .eq('action', 'Asignación')
             .order('timestamp', { ascending: false })
             .limit(1)
@@ -1309,13 +1309,13 @@ export async function assignMultipleTools(toolIds: string[], asignadoA: string, 
         
         await supabase.from('herramientas').update({
             estado: 'En Terreno',
-            asignadoA,
-            updatedAt: timestamp
+            asignadoa: asignadoA,
+            updatedat: timestamp
         }).eq('id', id);
 
         await supabase.from('tool_movements').insert({
             id: crypto.randomUUID(),
-            toolId: id,
+            toolid: id,
             toolName: tool?.nombre || 'Desconocida',
             action: 'Asignación',
             responsible: asignadoA,

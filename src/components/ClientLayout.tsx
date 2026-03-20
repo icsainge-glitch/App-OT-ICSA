@@ -3,6 +3,7 @@
 import { useUser } from "@/lib/auth-provider";
 import { MobileNav } from "@/components/MobileNav";
 import { usePathname } from "next/navigation";
+import { PullToRefresh } from "./PullToRefresh";
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
     const { user } = useUser();
@@ -17,10 +18,23 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
     const showNav = user && !isHiddenRoute;
 
+    const handleRefresh = async () => {
+        // Simple hard refresh of the current page
+        window.location.reload();
+        // Return a promise that never resolves to keep the loading state until reload
+        return new Promise<void>(() => {});
+    };
+
     return (
         <>
             <main className={showNav ? "pb-24 md:pb-0" : ""}>
-                {children}
+                {showNav ? (
+                    <PullToRefresh onRefresh={handleRefresh}>
+                        {children}
+                    </PullToRefresh>
+                ) : (
+                    children
+                )}
             </main>
             {showNav && <MobileNav />}
         </>

@@ -1393,11 +1393,12 @@ export async function saveHPT(hptData: any, workers: any[]) {
     }
 }
 
-export async function getHPTs(userId?: string, isAdmin?: boolean) {
+export async function getHPTs(userId?: string, isAdmin?: boolean, isPrevencionista?: boolean) {
     noStore();
     let query = supabase.from('hpt').select('*').order('createdat', { ascending: false });
     
-    if (!isAdmin && userId) {
+    // Admins and Prevencionistas see all
+    if (!isAdmin && !isPrevencionista && userId) {
         query = query.eq('createdby', userId);
     }
 
@@ -1406,13 +1407,43 @@ export async function getHPTs(userId?: string, isAdmin?: boolean) {
     
     let result = fromDbPayload(data || []) as any[];
 
-    if (!isAdmin && userId) {
+    // Filter by hiddenBy for everyone
+    if (userId) {
         result = result.filter((item: any) => {
             const hiddenBy = Array.isArray(item.hiddenBy) ? item.hiddenBy : [];
             return !hiddenBy.includes(userId);
         });
     }
     return result;
+}
+
+export async function hideHPT(hptId: string, userId: string) {
+    try {
+        const { data: hpt, error: fetchError } = await supabase
+            .from('hpt')
+            .select('hiddenby')
+            .eq('id', hptId)
+            .single();
+        
+        if (fetchError) throw fetchError;
+
+        const hiddenBy = Array.isArray(hpt.hiddenby) ? hpt.hiddenby : [];
+        if (!hiddenBy.includes(userId)) {
+            hiddenBy.push(userId);
+        }
+
+        const { error: updateError } = await supabase
+            .from('hpt')
+            .update({ hiddenby: hiddenBy })
+            .eq('id', hptId);
+        
+        if (updateError) throw updateError;
+        revalidatePath('/hpt');
+        return { success: true };
+    } catch (e: any) {
+        console.error("Error hiding HPT:", e);
+        return { success: false, error: e.message };
+    }
 }
 
 export async function getHPTById(id: string) {
@@ -1481,11 +1512,12 @@ export async function saveCapacitacion(capData: any, assistants: any[]) {
     }
 }
 
-export async function getCapacitaciones(userId?: string, isAdmin?: boolean) {
+export async function getCapacitaciones(userId?: string, isAdmin?: boolean, isPrevencionista?: boolean) {
     noStore();
     let query = supabase.from('capacitaciones').select('*').order('createdat', { ascending: false });
     
-    if (!isAdmin && userId) {
+    // Admins and Prevencionistas see all
+    if (!isAdmin && !isPrevencionista && userId) {
         query = query.eq('createdby', userId);
     }
 
@@ -1494,13 +1526,43 @@ export async function getCapacitaciones(userId?: string, isAdmin?: boolean) {
     
     let result = fromDbPayload(data || []) as any[];
 
-    if (!isAdmin && userId) {
+    // Filter by hiddenBy for everyone
+    if (userId) {
         result = result.filter((item: any) => {
             const hiddenBy = Array.isArray(item.hiddenBy) ? item.hiddenBy : [];
             return !hiddenBy.includes(userId);
         });
     }
     return result;
+}
+
+export async function hideCapacitacion(capId: string, userId: string) {
+    try {
+        const { data: cap, error: fetchError } = await supabase
+            .from('capacitaciones')
+            .select('hiddenby')
+            .eq('id', capId)
+            .single();
+        
+        if (fetchError) throw fetchError;
+
+        const hiddenBy = Array.isArray(cap.hiddenby) ? cap.hiddenby : [];
+        if (!hiddenBy.includes(userId)) {
+            hiddenBy.push(userId);
+        }
+
+        const { error: updateError } = await supabase
+            .from('capacitaciones')
+            .update({ hiddenby: hiddenBy })
+            .eq('id', capId);
+        
+        if (updateError) throw updateError;
+        revalidatePath('/capacitaciones');
+        return { success: true };
+    } catch (e: any) {
+        console.error("Error hiding Capacitacion:", e);
+        return { success: false, error: e.message };
+    }
 }
 
 export async function getCapacitacionById(id: string) {

@@ -5,13 +5,14 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, FileText, Calendar, User, Search, Loader2, Settings } from "lucide-react";
+import { ArrowLeft, Plus, FileText, Calendar, User, Search, Loader2, Settings, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser, useUserProfile } from "@/lib/auth-provider";
-import { getHPTs, getHPTById, getHPTQuestions } from "@/actions/db-actions";
+import { getHPTs, getHPTById, getHPTQuestions, hideHPT } from "@/actions/db-actions";
 import { useActionData } from "@/hooks/use-action-data";
 import { generateHPTPDF } from "@/lib/pdf-generator";
+import { useToast } from "@/hooks/use-toast";
 
 export default function HPTListPage() {
   const router = useRouter();
@@ -21,11 +22,14 @@ export default function HPTListPage() {
 
   const isAdmin = userProfile?.rol_t?.toLowerCase() === 'admin' || 
     userProfile?.rol_t?.toLowerCase() === 'administrador';
+  const isPrevencionista = userProfile?.rol_t?.toLowerCase() === 'prevencionista' || 
+    userProfile?.rol_t?.toLowerCase() === 'prevenc';
+  const { toast } = useToast();
 
-  const { data: hpts, isLoading: hptLoading } = useActionData<any[]>(() => {
+  const { data: hpts, isLoading: hptLoading, refetch } = useActionData<any[]>(() => {
     if (!user?.uid || isProfileLoading) return Promise.resolve([]);
-    return getHPTs(user.uid, isAdmin);
-  }, [user?.uid, isAdmin, isProfileLoading]);
+    return getHPTs(user.uid, isAdmin, isPrevencionista);
+  }, [user?.uid, isAdmin, isPrevencionista, isProfileLoading]);
 
   useEffect(() => {
     if (!isUserLoading && !user) router.push("/login");
@@ -36,9 +40,6 @@ export default function HPTListPage() {
     hpt.trabajoRealizar?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     hpt.folio?.toString().includes(searchTerm)
   );
-
-  const isPrevencionista = userProfile?.rol_t?.toLowerCase() === 'prevencionista' || 
-    userProfile?.rol_t?.toLowerCase() === 'prevenc';
 
   const canEditHPT = (hpt: any) => {
     if (isAdmin || isPrevencionista) return true;
@@ -55,6 +56,23 @@ export default function HPTListPage() {
       }
     } catch (e) {
       console.error("Error generating HPT PDF:", e);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!user?.uid) return;
+    if (!confirm("¿Está seguro que desea borrar este HPT? Solo dejará de verlo usted, otros autorizados podrán seguir viéndolo.")) return;
+
+    try {
+      const res = await hideHPT(id, user.uid);
+      if (res.success) {
+        toast({ title: "Documento borrado", description: "El HPT ha sido ocultado de su lista." });
+        refetch();
+      } else {
+        toast({ title: "Error", description: res.error, variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Error", description: "No se pudo borrar el documento", variant: "destructive" });
     }
   };
 
@@ -147,7 +165,7 @@ export default function HPTListPage() {
                   <div className="bg-muted/30 p-3 flex gap-2">
                     {canEditHPT(hpt) && (
                       <Link href={`/hpt/${hpt.id}/edit`} className="flex-1">
-                        <Button variant="ghost" className="w-full h-10 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-white text-primary">Editar</Button>
+                        <Button variant="outline" className="w-full h-10 rounded-xl font-black text-[10px] uppercase tracking-widest bg-white text-primary border-none shadow-sm">Editar</Button>
                       </Link>
                     )}
                     <Button 
@@ -155,6 +173,15 @@ export default function HPTListPage() {
                       className="flex-1 h-10 rounded-xl bg-primary text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20"
                     >
                       Ver PDF
+                    </Button>
+                    <Button 
+                      onClick={() => handleDelete(hpt.id)}
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 rounded-xl text-destructive hover:bg-destructive/10"
+                      title="Borrar"
+                    >
+                      <Trash2 className="h-5 w-5" />
                     </Button>
                   </div>
                 </CardContent>

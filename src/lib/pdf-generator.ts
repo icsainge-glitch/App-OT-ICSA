@@ -1052,39 +1052,62 @@ const buildHPTPDF = async (doc: jsPDF, data: any, questions: any[] = [], logoBas
   currentY = (doc as any).lastAutoTable.finalY + 15;
   
   // Final Signature logic
+  // Check for page break (Signature block needs about 30-40mm)
+  if (currentY > pageHeight - 40) {
+    doc.addPage();
+    drawHeader(doc.getNumberOfPages());
+    currentY = 45; // Start below header on new page
+  }
+
+  doc.setTextColor(0);
   const sigY = currentY + 15;
-  if (data.prevencion_signature_url || data.prevencionsignatureurl) {
+  
+  // Debug names to be extra sure (they will show up if available)
+  const sName = data.supervisorName || data.supervisorname || "N/A";
+  const pName = data.prevencionName || data.prevencionname || "Depto. Prevención";
+
+  if (data.prevencionSignatureUrl || data.prevencion_signature_url || data.prevencionsignatureurl) {
     const leftX = margin + 30;
     const rightX = pageWidth - margin - 30;
 
     // Supervisor
     doc.line(leftX - 30, sigY, leftX + 30, sigY);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("SUPERVISOR ICSA", leftX, sigY + 4, { align: "center" });
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.text("FIRMA SUPERVISOR", leftX, sigY + 5, { align: "center" });
-    doc.text(data.supervisorName || data.supervisorname || "", leftX, sigY + 9, { align: "center" });
+    doc.text(`Nombre: ${sName}`, leftX, sigY + 8, { align: "center" });
     const fsig = data.firmaSupervisor || data.firmasupervisor;
     if(fsig) {
-      try { doc.addImage(fsig, 'PNG', leftX - 25, sigY - 20, 50, 18); } catch(e){}
+      try { doc.addImage(fsig, 'PNG', leftX - 25, sigY - 18, 50, 16); } catch(e){}
     }
 
     // Prevención
     doc.line(rightX - 30, sigY, rightX + 30, sigY);
-    doc.text("FIRMA PREVENCIÓN", rightX, sigY + 5, { align: "center" });
-    doc.text(data.prevencionName || data.prevencionname || "Depto. Prevención", rightX, sigY + 9, { align: "center" });
-    const psig = data.prevencion_signature_url || data.prevencionsignatureurl;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("PREVENCIÓN DE RIESGOS", rightX, sigY + 4, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text(`Nombre: ${pName}`, rightX, sigY + 8, { align: "center" });
+    const psig = data.prevencionSignatureUrl || data.prevencion_signature_url || data.prevencionsignatureurl;
     if(psig) {
-      try { doc.addImage(psig, 'PNG', rightX - 25, sigY - 20, 50, 18); } catch(e){}
+      try { doc.addImage(psig, 'PNG', rightX - 25, sigY - 18, 50, 16); } catch(e){}
     }
   } else {
     const sigX = pageWidth / 2;
     doc.line(sigX - 30, sigY, sigX + 30, sigY);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("SUPERVISOR ICSA (Responsable)", sigX, sigY + 4, { align: "center" });
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.text("FIRMA FINAL SUPERVISOR", sigX, sigY + 5, { align: "center" });
-    doc.text(data.supervisorName || data.supervisorname || "", sigX, sigY + 9, { align: "center" });
+    doc.text(`Nombre: ${sName}`, sigX, sigY + 8, { align: "center" });
     
     const fsig = data.firmaSupervisor || data.firmasupervisor;
     if(fsig) {
-      try { doc.addImage(fsig, 'PNG', sigX - 25, sigY - 20, 50, 18); } catch(e){}
+      try { doc.addImage(fsig, 'PNG', sigX - 25, sigY - 18, 50, 16); } catch(e){}
     }
   }
   return doc;
@@ -1163,24 +1186,34 @@ export const generateCharlaPDF = async (data: any) => {
   }
 
   // Final Signatures
+  doc.setTextColor(0);
   if (currentY > pageHeight - 60) { doc.addPage(); currentY = 40; }
   doc.setDrawColor(200, 200, 200);
   
   // Left: Supervisor/Relator
   doc.line(margin, currentY, margin + 60, currentY);
-  doc.text("FIRMA RESPONSABLE", margin, currentY + 5);
-  doc.text(data.supervisorName || '', margin, currentY + 10);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.text("SUPERVISOR / RELATOR", margin, currentY + 4);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text(`Nombre: ${data.supervisorName || ''}`, margin, currentY + 8);
   if (data.firmaSupervisor) {
-    try { doc.addImage(data.firmaSupervisor, 'PNG', margin, currentY - 20, 40, 18); } catch (e) { }
+    try { doc.addImage(data.firmaSupervisor, 'PNG', margin, currentY - 18, 40, 16); } catch (e) { }
   }
 
   // Right: Prevención (if signed)
-  if (data.prevencion_signature_url) {
+  if (data.prevencionSignatureUrl || data.prevencion_signature_url) {
     const rightX = pageWidth - margin - 60;
     doc.line(rightX, currentY, pageWidth - margin, currentY);
-    doc.text("FIRMA PREVENCIÓN", rightX, currentY + 5);
-    doc.text(data.prevencionName || 'Departamento de Prevención', rightX, currentY + 10);
-    try { doc.addImage(data.prevencion_signature_url, 'PNG', rightX, currentY - 20, 40, 18); } catch (e) { }
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("VALIDACIÓN PREVENCIÓN", rightX, currentY + 4);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text(`Nombre: ${data.prevencionName || 'Depto. Prevención'}`, rightX, currentY + 8);
+    const psig = data.prevencionSignatureUrl || data.prevencion_signature_url;
+    try { doc.addImage(psig, 'PNG', rightX, currentY - 18, 40, 16); } catch (e) { }
   }
 
 

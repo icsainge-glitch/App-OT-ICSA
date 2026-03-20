@@ -55,7 +55,7 @@ export default function CharlasListPage() {
 
   const handleDelete = async (id: string) => {
     if (!user?.uid) return;
-    if (!confirm("¿Está seguro que desea borrar esta charla? Solo dejará de verla usted, otros autorizados podrán seguir viéndola.")) return;
+    if (!confirm("¿Está seguro que desea borrar esta charla? Esta acción no será reversible.")) return;
 
     try {
       const res = await hideCapacitacion(id, user.uid);

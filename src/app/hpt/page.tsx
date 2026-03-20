@@ -61,7 +61,7 @@ export default function HPTListPage() {
 
   const handleDelete = async (id: string) => {
     if (!user?.uid) return;
-    if (!confirm("¿Está seguro que desea borrar este HPT? Solo dejará de verlo usted, otros autorizados podrán seguir viéndolo.")) return;
+    if (!confirm("¿Está seguro que desea borrar este HPT? Esta acción no será reversible.")) return;
 
     try {
       const res = await hideHPT(id, user.uid);

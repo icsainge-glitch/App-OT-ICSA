@@ -65,7 +65,9 @@ const KEY_MAPPING: { [key: string]: string } = {
     'startdate': 'startDate',
     'enddate': 'endDate',
     'clientname': 'clientName',
-    'teamnames': 'teamNames'
+    'teamnames': 'teamNames',
+    'imageurl': 'imageUrl',
+    'descripcion': 'descripcion'
 };
 
 // Reverse mapping for toDbPayload
@@ -1247,9 +1249,12 @@ export async function saveTool(data: any, signatureUrl?: string) {
         console.error("Error recording tool movement:", e);
     }
 
-    const { error } = await supabase.from('herramientas').upsert(toDbPayload(data));
+    const { error } = await supabase.from('herramientas').upsert(toDbPayload({
+        ...data,
+        updatedAt: new Date().toISOString()
+    }));
     if (error) throw error;
-    revalidatePath('/tools');
+    revalidatePath('/dashboard');
     return { success: true };
 }
 

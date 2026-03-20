@@ -13,12 +13,23 @@ import { getCapacitaciones, getCapacitacionById, hideCapacitacion } from "@/acti
 import { useActionData } from "@/hooks/use-action-data";
 import { generateCharlaPDF } from "@/lib/pdf-generator";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function CharlasListPage() {
   const router = useRouter();
   const { user, isUserLoading } = useUser();
   const { userProfile, isProfileLoading } = useUserProfile();
   const [searchTerm, setSearchTerm] = useState("");
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
   const isAdmin = userProfile?.rol_t?.toLowerCase() === 'admin' || 
     userProfile?.rol_t?.toLowerCase() === 'administrador';
@@ -53,12 +64,15 @@ export default function CharlasListPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!user?.uid) return;
-    if (!confirm("¿Está seguro que desea borrar esta charla? Esta acción no será reversible.")) return;
+  const handleDelete = (id: string) => {
+    setItemToDelete(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!user?.uid || !itemToDelete) return;
 
     try {
-      const res = await hideCapacitacion(id, user.uid);
+      const res = await hideCapacitacion(itemToDelete, user.uid);
       if (res.success) {
         toast({ title: "Documento borrado", description: "La charla ha sido ocultada de su lista." });
         refetch();
@@ -67,6 +81,8 @@ export default function CharlasListPage() {
       }
     } catch (e) {
       toast({ title: "Error", description: "No se pudo borrar el documento", variant: "destructive" });
+    } finally {
+      setItemToDelete(null);
     }
   };
 
@@ -190,6 +206,26 @@ export default function CharlasListPage() {
           </div>
         )}
       </main>
+
+      <AlertDialog open={!!itemToDelete} onOpenChange={(open) => !open && setItemToDelete(null)}>
+        <AlertDialogContent className="rounded-3xl border-none">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-black uppercase tracking-tighter">¿Está absolutamente seguro?</AlertDialogTitle>
+            <AlertDialogDescription className="font-medium text-muted-foreground italic">
+              Esta acción no será reversible. El documento se ocultará de su lista de forma permanente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-2xl font-black uppercase tracking-widest text-[10px] border-none bg-muted/50">Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="rounded-2xl font-black uppercase tracking-widest text-[10px] bg-destructive text-white hover:bg-destructive/90 shadow-lg shadow-destructive/20"
+            >
+              Confirmar Borrado
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

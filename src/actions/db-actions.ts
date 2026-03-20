@@ -61,7 +61,11 @@ const KEY_MAPPING: { [key: string]: string } = {
     'signature_token': 'signatureToken',
     'token_expiry': 'tokenExpiry',
     'prevencion_signature_url': 'prevencionSignatureUrl',
-    'prevencion_signature_date': 'prevencionSignatureDate'
+    'prevencion_signature_date': 'prevencionSignatureDate',
+    'startdate': 'startDate',
+    'enddate': 'endDate',
+    'clientname': 'clientName',
+    'teamnames': 'teamNames'
 };
 
 // Reverse mapping for toDbPayload
@@ -249,7 +253,7 @@ export async function getActiveProjects(userId?: string, isAdmin?: boolean, incl
         }
     }
 
-    return projects;
+    return fromDbPayload(projects);
 }
 
 export async function saveWorkOrderAndStatus(data: any, isArchived: boolean = false) {

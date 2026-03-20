@@ -466,20 +466,6 @@ function DashboardContent() {
                   <Plus size={18} className="mr-2" /> Crear OT
                 </Button>
               </Link>
-              {activeTab !== "dashboard" && (
-                <>
-                  <Link href="/hpt/new">
-                    <Button className="hidden lg:flex bg-slate-800 hover:bg-slate-900 text-white font-black rounded-2xl h-11 px-6 shadow-[0_8px_20px_rgba(0,0,0,0.1)] transition-all hover:-translate-y-0.5 active:scale-95">
-                      <Plus size={18} className="mr-2" /> Nuevo HPT
-                    </Button>
-                  </Link>
-                  <Link href="/capacitaciones/new">
-                    <Button className="hidden lg:flex bg-slate-800 hover:bg-slate-900 text-white font-black rounded-2xl h-11 px-6 shadow-[0_8px_20_rgba(0,0,0,0.1)] transition-all hover:-translate-y-0.5 active:scale-95">
-                      <Plus size={18} className="mr-2" /> Nueva Charla
-                    </Button>
-                  </Link>
-                </>
-              )}
             </div>
           )}
         </div>

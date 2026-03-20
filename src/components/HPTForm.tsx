@@ -36,6 +36,11 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 const STEPS = [
   { id: 'general', title: 'Información General', icon: Briefcase },
@@ -136,6 +141,7 @@ export function HPTForm({ initialData }: { initialData?: any }) {
   const [folio, setFolio] = useState<number | string>(initialData?.folio || 0);
   const [personnel, setPersonnel] = useState<any[]>([]);
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
+  const [openProjectSearch, setOpenProjectSearch] = useState(false);
   const [selectedPersonnelIds, setSelectedPersonnelIds] = useState<string[]>([]);
 
   const isAdmin = userProfile?.rol_t?.toLowerCase() === 'admin' || 
@@ -394,24 +400,63 @@ export function HPTForm({ initialData }: { initialData?: any }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label className="font-black uppercase text-[10px] text-muted-foreground ml-1">Vincular a Proyecto</Label>
-                    <select 
-                      className="w-full h-14 rounded-2xl bg-muted/30 border-none px-6 font-bold text-sm outline-none focus:ring-2 focus:ring-primary/20 appearance-none"
-                      value={formData.projectId}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const proj = projects?.find(p => p.id === val);
-                        setFormData(prev => ({ 
-                          ...prev, 
-                          projectId: val,
-                          projectName: proj ? proj.name : (val === "" || val === "none" ? "General / Sin Proyecto" : prev.projectName)
-                        }));
-                      }}
-                    >
-                      <option value="">Independiente / Sin Proyecto</option>
-                      {projects?.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Input 
+                          placeholder="Nombre del proyecto (manual)" 
+                          value={formData.projectName} 
+                          onChange={(e) => setFormData(prev => ({ 
+                            ...prev, 
+                            projectName: e.target.value,
+                            projectId: "manual" 
+                          }))}
+                          className="h-14 bg-muted/30 border-none rounded-2xl font-bold px-6 shadow-inner focus-visible:ring-primary"
+                        />
+                      </div>
+                      <Popover open={openProjectSearch} onOpenChange={setOpenProjectSearch}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="icon" className="h-14 w-14 rounded-2xl bg-primary text-white hover:bg-primary/90 shadow-lg shrink-0">
+                            <Search className="h-6 w-6" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] md:w-[400px] p-0 shadow-2xl rounded-3xl border-none overflow-hidden" align="end">
+                          <Command>
+                            <CommandInput placeholder="Buscar proyecto..." className="h-14 font-bold border-none" />
+                            <CommandList className="max-h-[300px]">
+                              <CommandEmpty className="p-6 text-center text-sm font-bold opacity-40">No se encontraron proyectos.</CommandEmpty>
+                              <CommandGroup heading="Proyectos Activos" className="p-2">
+                                <CommandItem 
+                                  onSelect={() => {
+                                    setFormData(prev => ({ ...prev, projectId: "", projectName: "General / Sin Proyecto" }));
+                                    setOpenProjectSearch(false);
+                                  }} 
+                                  className="p-4 cursor-pointer rounded-2xl aria-selected:bg-primary aria-selected:text-white"
+                                >
+                                  <Briefcase className="h-5 w-5 mr-3" />
+                                  <span className="font-black text-xs uppercase">General / Sin Proyecto</span>
+                                </CommandItem>
+                                {projects?.map((p) => (
+                                  <CommandItem 
+                                    key={p.id} 
+                                    onSelect={() => {
+                                      setFormData(prev => ({ ...prev, projectId: p.id, projectName: p.name }));
+                                      setOpenProjectSearch(false);
+                                    }} 
+                                    className="p-4 cursor-pointer rounded-2xl aria-selected:bg-primary aria-selected:text-white"
+                                  >
+                                    <Briefcase className="h-5 w-5 mr-3" />
+                                    <div className="flex flex-col">
+                                      <span className="font-black text-xs uppercase">{p.name}</span>
+                                      {p.clientName && <span className="text-[10px] opacity-60 font-bold">{p.clientName}</span>}
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label className="font-black uppercase text-[10px] text-muted-foreground ml-1">Fecha</Label>

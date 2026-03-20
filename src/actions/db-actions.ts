@@ -1105,6 +1105,19 @@ export async function submitRemoteSignature(input: any) {
         const { error: deleteError } = await supabase.from('ordenes').delete().eq('id', input.orderId);
         if (deleteError) throw deleteError;
 
+        // If this is an "Acta Final" (isProjectSummary), update the project status too
+        if (completedData.isProjectSummary && completedData.projectId) {
+            try {
+                await supabase.from('projects').update({
+                    status: 'Completed',
+                    endDate: completedData.signatureDate,
+                    summary: completedData.description 
+                }).eq('id', completedData.projectId);
+            } catch (projectErr) {
+                console.error("Error updating project status after remote signature:", projectErr);
+            }
+        }
+
         // Trigger automated email
         if (completedData.clientReceiverEmail) {
             try {

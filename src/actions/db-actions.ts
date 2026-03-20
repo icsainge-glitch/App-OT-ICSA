@@ -7,16 +7,97 @@ import { sendProjectInvitationEmail } from '@/ai/flows/send-project-invitation-e
 import { revalidatePath, unstable_noStore as noStore } from 'next/cache';
 import crypto from 'crypto';
 
+// Mapping utilities for Global Case Sensitivity Fix
+const KEY_MAPPING: { [key: string]: string } = {
+    // Database lowercase -> Frontend camelCase
+    'nombrecliente': 'nombreCliente',
+    'rutcliente': 'rutCliente',
+    'telefonocliente': 'telefonoCliente',
+    'emailclientes': 'emailClientes',
+    'direccioncliente': 'direccionCliente',
+    'comunacliente': 'comunaCliente',
+    'razonsocial': 'razonSocial',
+    'estadocliente': 'estadoCliente',
+    'createdat': 'createdAt',
+    'updatedat': 'updatedAt',
+    'projectid': 'projectId',
+    'clientid': 'clientId',
+    'teamids': 'teamIds',
+    'hiddenby': 'hiddenBy',
+    'createdby': 'createdBy',
+    'iscert': 'isCert',
+    'islabeled': 'isLabeled',
+    'isprojectsummary': 'isProjectSummary',
+    'detalletecnico': 'detalleTecnico',
+    'puntosred': 'puntosRed',
+    'supervisorname': 'supervisorName',
+    'supervisorrut': 'supervisorRut',
+    'trabajorealizar': 'trabajoRealizar',
+    'medidasseguridad': 'medidasSeguridad',
+    'firmasupervisor': 'firmaSupervisor',
+    'horainicio': 'horaInicio',
+    'horatermino': 'horaTermino',
+    'prevencionemail': 'prevencionEmail',
+    'prevencionname': 'prevencionName',
+    'interventionaddress': 'interventionAddress',
+    'tipotrabajootro': 'tipoTrabajoOtro',
+    'observacionesgenerales': 'observacionesGenerales',
+    'estadotrabajo': 'estadoTrabajo',
+    'condicionescobro': 'condicionesCobro',
+    'technicianid': 'technicianId',
+    'clientrut': 'clientRut',
+    'clientphone': 'clientPhone',
+    'clientemail': 'clientEmail',
+    'clientreceiveremail': 'clientReceiverEmail',
+    'clientreceivername': 'clientReceiverName',
+    'clientreceiverrut': 'clientReceiverRut',
+    'techname': 'techName',
+    'techrut': 'techRut',
+    'techsignatureurl': 'techSignatureUrl',
+    'clientsignatureurl': 'clientSignatureUrl',
+    'signaturedate': 'signatureDate',
+    'sketchimageurl': 'sketchImageUrl'
+};
+
+/**
+ * Standardizes a payload for Supabase by lowercasing all top-level keys.
+ */
+function toDbPayload(data: any) {
+    if (!data || typeof data !== 'object') return data;
+    const payload: any = {};
+    Object.keys(data).forEach(key => {
+        payload[key.toLowerCase()] = data[key];
+    });
+    return payload;
+}
+
+/**
+ * Standardizes a database record for the frontend by mapping common lowercase keys back to camelCase.
+ */
+function fromDbPayload(data: any | any[]): any {
+    if (!data) return data;
+    if (Array.isArray(data)) return data.map(item => fromDbPayload(item) as any);
+    
+    const result: any = { ...data };
+    Object.keys(data).forEach(key => {
+        const mappedKey = KEY_MAPPING[key.toLowerCase()];
+        if (mappedKey && mappedKey !== key) {
+            result[mappedKey] = data[key];
+        }
+    });
+    return result;
+}
+
 export async function getClients() {
     try {
         noStore();
         const { data, error } = await supabase
             .from('clients')
             .select('*')
-            .order('nombreCliente', { ascending: true });
+            .order('nombrecliente', { ascending: true }); // Lowercase in DB
         
         if (error) throw error;
-        return data || [];
+        return fromDbPayload(data) || [];
     } catch (e: any) {
         console.error("Error en getClients:", e);
         return [];
@@ -31,7 +112,7 @@ export async function getPersonnel() {
             .order('nombre_t', { ascending: true });
         
         if (error) throw error;
-        return data || [];
+        return fromDbPayload(data) || [];
     } catch (e: any) {
         console.error("Error en getPersonnel:", e);
         return [];
@@ -179,7 +260,7 @@ export async function saveWorkOrderAndStatus(data: any, isArchived: boolean = fa
 
         const { error } = await supabase
             .from(table)
-            .upsert(payload, { onConflict: 'id' });
+            .upsert(toDbPayload(payload), { onConflict: 'id' });
 
         if (error) {
             console.error(`Error de Supabase en ${table}:`, error);
@@ -308,13 +389,13 @@ export async function getWorkOrders(userId?: string, isAdmin?: boolean) {
         throw error;
     }
 
-    let orders = data || [];
+    let orders = fromDbPayload(data || []);
     
     // Memory-level security filtering if DB filter failed or for extra safety
     if (!isAdmin && userId) {
         // 1. Filter by teamIds
-        const beforeTeam = orders.length;
-        orders = orders.filter((o: any) => {
+        const beforeTeam = (orders as any[]).length;
+        orders = (orders as any[]).filter((o: any) => {
             const tIds = Array.isArray(o.teamIds) ? o.teamIds : [];
             return tIds.includes(userId);
         });
@@ -374,13 +455,13 @@ export async function getArchivedWorkOrders(userId?: string, isAdmin?: boolean) 
         throw error;
     }
 
-    let orders = data || [];
+    let orders = fromDbPayload(data || []);
 
     // Memory-level security filtering
     if (!isAdmin && userId) {
         // 1. Filter by teamIds
-        const beforeTeam = orders.length;
-        orders = orders.filter((o: any) => {
+        const beforeTeam = (orders as any[]).length;
+        orders = (orders as any[]).filter((o: any) => {
             const tIds = Array.isArray(o.teamIds) ? o.teamIds : [];
             return tIds.includes(userId);
         });
@@ -404,7 +485,7 @@ export async function getProjectById(id: string) {
         .single();
         
     if (error) return null;
-    return project;
+    return fromDbPayload(project);
 }
 
 export async function getUserProfile(id: string) {
@@ -415,7 +496,7 @@ export async function getUserProfile(id: string) {
         .eq('id', id)
         .single();
     if (error) return null;
-    return data;
+    return fromDbPayload(data);
 }
 
 export async function getToolsByResponsible(responsibleName: string) {
@@ -427,7 +508,7 @@ export async function getToolsByResponsible(responsibleName: string) {
         .order('nombre', { ascending: true });
     
     if (error) throw error;
-    return data || [];
+    return fromDbPayload(data || []);
 }
 
 export async function getClientById(id: string) {
@@ -438,7 +519,7 @@ export async function getClientById(id: string) {
         .eq('id', id)
         .single();
     if (error) return null;
-    return data;
+    return fromDbPayload(data);
 }
 
 export async function deleteRecord(table: string, id: string, userId?: string, isAdmin?: boolean) {
@@ -474,7 +555,7 @@ export async function deleteRecord(table: string, id: string, userId?: string, i
 }
 
 export async function createClient(data: any) {
-    const { error } = await supabase.from('clients').insert(data);
+    const { error } = await supabase.from('clients').insert(toDbPayload(data));
     if (error) throw error;
     return { success: true };
 }
@@ -482,7 +563,7 @@ export async function createClient(data: any) {
 export async function updateClient(id: string, data: any) {
     const { error } = await supabase
         .from('clients')
-        .update(data)
+        .update(toDbPayload(data))
         .eq('id', id);
     if (error) throw error;
     return { success: true };
@@ -535,10 +616,10 @@ export async function getPersonnelById(id: string) {
 
         if (userError) console.warn("[DEBUG_DB] Fallo al obtener password:", userError.message);
 
-        return { 
+        return fromDbPayload({ 
             ...person, 
             password: userData?.password || null 
-        };
+        });
     } catch (e: any) {
         console.error("[DEBUG_DB] ERROR CRÍTICO:", e);
         return null;
@@ -546,14 +627,14 @@ export async function getPersonnelById(id: string) {
 }
 
 export async function createPersonnel(data: any) {
-    const { error } = await supabase.from('personnel').insert(data);
+    const { error } = await supabase.from('personnel').insert(toDbPayload(data));
     if (error) throw error;
     return { success: true };
 }
 
 export async function updatePersonnel(id: string, data: any) {
     try {
-        const { error: personnelError } = await supabase.from('personnel').update(data).eq('id', id);
+        const { error: personnelError } = await supabase.from('personnel').update(toDbPayload(data)).eq('id', id);
         if (personnelError) {
             console.error("Error updating personnel:", personnelError.message);
             throw personnelError;
@@ -601,7 +682,7 @@ export async function createPersonnelAccount(personnelData: any, password: strin
     }
 
     // Create Personnel record
-    const { error: personnelError } = await supabase.from('personnel').insert({
+    const { error: personnelError } = await supabase.from('personnel').insert(toDbPayload({
         id: personnelData.id,
         nombre_t: personnelData.nombre_t,
         rut_t: personnelData.rut_t,
@@ -614,7 +695,7 @@ export async function createPersonnelAccount(personnelData: any, password: strin
         estado_t: personnelData.estado_t || 'Activo',
         createdAt: personnelData.createdAt,
         updatedBy: personnelData.registeredBy
-    });
+    }));
     if (personnelError) {
         console.error("Error al insertar en personnel:", personnelError);
         throw new Error(`Error en tabla personnel: ${personnelError.message}`);
@@ -655,7 +736,7 @@ export async function createProject(data: any) {
     // DIAGNOSTIC LOG
     console.log("[DIAGNOSTIC] Creating project with payload:", JSON.stringify(payload, null, 2));
 
-    const { error } = await supabase.from('projects').insert(payload);
+    const { error } = await supabase.from('projects').insert(toDbPayload(payload));
     if (error) {
         console.error("[CREATE_PROJECT_ERROR]", error);
         throw error;
@@ -711,7 +792,7 @@ export async function getProjectOrders(projectId: string, userId?: string, isAdm
         .select('*')
         .eq('projectId', projectId)
         .not('status', 'in', '("Completed", "Completado")')
-        .order('updatedAt', { ascending: false });
+        .order('updatedat', { ascending: false }); // lowercase DB
 
     if (!isAdmin && userId) {
         // filter by hiddenBy manually or with RPC if needed. In-memory for now to keep it simple
@@ -720,9 +801,9 @@ export async function getProjectOrders(projectId: string, userId?: string, isAdm
     const { data, error } = await query;
     if (error) throw error;
 
-    let orders = data || [];
+    let orders = fromDbPayload(data || []);
     if (!isAdmin && userId) {
-        orders = orders.filter((order: any) => {
+        orders = (orders as any[]).filter((order: any) => {
             const hiddenBy = Array.isArray(order.hiddenBy) ? order.hiddenBy : [];
             return !hiddenBy.includes(userId);
         });
@@ -735,14 +816,14 @@ export async function getProjectArchivedOrders(projectId: string, userId?: strin
         .from('historial')
         .select('*')
         .eq('projectId', projectId)
-        .order('updatedAt', { ascending: false });
+        .order('updatedat', { ascending: false }); // lowercase DB
 
     const { data, error } = await query;
     if (error) throw error;
 
-    let orders = data || [];
+    let orders = fromDbPayload(data || []);
     if (!isAdmin && userId) {
-        orders = orders.filter((order: any) => {
+        orders = (orders as any[]).filter((order: any) => {
             const hiddenBy = Array.isArray(order.hiddenBy) ? order.hiddenBy : [];
             return !hiddenBy.includes(userId);
         });
@@ -928,7 +1009,7 @@ export async function closeProject(
     // If it's signed, we should ideally put it in 'historial' directly or insert and then move.
     // Let's insert into 'ordenes' if pending, or 'historial' if completed.
     if (isSigned) {
-        const { error: summaryError } = await supabase.from('historial').insert(summaryOtData);
+        const { error: summaryError } = await supabase.from('historial').insert(toDbPayload(summaryOtData));
         if (summaryError) throw summaryError;
 
         // Trigger automated email if completed
@@ -936,7 +1017,7 @@ export async function closeProject(
             sendWorkOrderEmail({ order: summaryOtData }).catch(err => console.error("Email error:", err));
         }
     } else {
-        const { error: summaryError } = await supabase.from('ordenes').insert(summaryOtData);
+        const { error: summaryError } = await supabase.from('ordenes').insert(toDbPayload(summaryOtData));
         if (summaryError) throw summaryError;
     }
 
@@ -967,8 +1048,8 @@ export async function getOrderById(id: string) {
             .single();
         order = archivedOrder;
     }
-
-    return order;
+    
+    return fromDbPayload(order);
 }
 
 export async function submitRemoteSignature(input: any) {
@@ -999,7 +1080,7 @@ export async function submitRemoteSignature(input: any) {
 
     try {
         // Move to history
-        const { error: insertError } = await supabase.from('historial').insert(completedData);
+        const { error: insertError } = await supabase.from('historial').insert(toDbPayload(completedData));
         if (insertError) throw insertError;
 
         // Delete from active
@@ -1035,7 +1116,7 @@ export async function getTools() {
         .select('*')
         .order('nombre', { ascending: true });
     if (error) throw error;
-    return data || [];
+    return fromDbPayload(data || []);
 }
 
 export async function getToolMovements(period: 'daily' | 'weekly' | 'monthly' | 'all' = 'all') {
@@ -1117,7 +1198,7 @@ export async function saveTool(data: any, signatureUrl?: string) {
             }
 
             const movementId = crypto.randomUUID();
-            await supabase.from('tool_movements').insert({
+            await supabase.from('tool_movements').insert(toDbPayload({
                 id: movementId,
                 toolId: data.id,
                 toolName: data.nombre || currentTool?.nombre,
@@ -1129,20 +1210,16 @@ export async function saveTool(data: any, signatureUrl?: string) {
                 assignmentDate,
                 batchId,
                 signatureUrl: signatureUrl || null
-            });
+            }));
         }
     } catch (e) {
         console.error("Error recording tool movement:", e);
     }
 
-    const payload = {
-        ...data,
-        updatedAt: new Date().toISOString(),
-        createdAt: data.createdAt || new Date().toISOString()
-    };
-
-    const { error } = await supabase.from('herramientas').upsert(payload);
+    const { error } = await supabase.from('herramientas').upsert(toDbPayload(data));
     if (error) throw error;
+    revalidatePath('/tools');
+    return { success: true };
 }
 
 export async function deleteTool(id: string) {
@@ -1281,13 +1358,11 @@ export async function getNextFolioHPT() {
 export async function saveHPT(hptData: any, workers: any[]) {
     try {
         const hptId = hptData.id || crypto.randomUUID();
-        const payload: any = {};
-        Object.keys(hptData).forEach(key => {
-            payload[key.toLowerCase()] = hptData[key];
+        const payload = toDbPayload({
+            ...hptData,
+            id: hptId,
+            updatedAt: new Date().toISOString()
         });
-
-        payload.id = hptId;
-        payload.updatedat = new Date().toISOString();
 
         if (payload.projectid === "") payload.projectid = null;
         if (payload.createdby === "") payload.createdby = null;
@@ -1329,22 +1404,11 @@ export async function getHPTs(userId?: string, isAdmin?: boolean) {
     let { data, error } = await query;
     if (error) throw error;
     
-    let result = (data || []).map((item: any) => ({
-        ...item,
-        projectId: item.projectid,
-        supervisorName: item.supervisorname,
-        supervisorRut: item.supervisorrut,
-        trabajoRealizar: item.trabajorealizar,
-        medidasSeguridad: item.medidasseguridad,
-        firmaSupervisor: item.firmasupervisor,
-        createdBy: item.createdby,
-        createdAt: item.createdat,
-        updatedAt: item.updatedat
-    }));
+    let result = fromDbPayload(data || []) as any[];
 
     if (!isAdmin && userId) {
         result = result.filter((item: any) => {
-            const hiddenBy = Array.isArray(item.hiddenby) ? item.hiddenby : [];
+            const hiddenBy = Array.isArray(item.hiddenBy) ? item.hiddenBy : [];
             return !hiddenBy.includes(userId);
         });
     }
@@ -1359,16 +1423,7 @@ export async function getHPTById(id: string) {
     const { data: workers, error: workersError } = await supabase.from('hpt_workers').select('*').eq('hpt_id', id);
     
     return {
-        ...hpt,
-        projectId: hpt.projectid,
-        supervisorName: hpt.supervisorname,
-        supervisorRut: hpt.supervisorrut,
-        trabajoRealizar: hpt.trabajorealizar,
-        medidasSeguridad: hpt.medidasseguridad,
-        firmaSupervisor: hpt.firmasupervisor,
-        createdBy: hpt.createdby,
-        createdAt: hpt.createdat,
-        updatedAt: hpt.updatedat,
+        ...fromDbPayload(hpt),
         workers: workers || []
     };
 }
@@ -1393,13 +1448,11 @@ export async function getNextFolioCapacitacion() {
 export async function saveCapacitacion(capData: any, assistants: any[]) {
     try {
         const capId = capData.id || crypto.randomUUID();
-        const payload: any = {};
-        Object.keys(capData).forEach(key => {
-            payload[key.toLowerCase()] = capData[key];
+        const payload = toDbPayload({
+            ...capData,
+            id: capId,
+            updatedAt: new Date().toISOString()
         });
-        
-        payload.id = capId;
-        payload.updatedat = new Date().toISOString();
 
         if (payload.createdby === "") payload.createdby = null;
 
@@ -1439,26 +1492,11 @@ export async function getCapacitaciones(userId?: string, isAdmin?: boolean) {
     let { data, error } = await query;
     if (error) throw error;
     
-    let result = (data || []).map((item: any) => ({
-        ...item,
-        supervisorName: item.supervisorname,
-        horaInicio: item.horainicio,
-        horaTermino: item.horatermino,
-        firmaSupervisor: item.firmasupervisor,
-        prevencionName: item.prevencionname,
-        prevencionEmail: item.prevencionemail,
-        signature_token: item.signature_token,
-        token_expiry: item.token_expiry,
-        prevencion_signature_url: item.prevencion_signature_url,
-        prevencion_signature_date: item.prevencion_signature_date,
-        createdBy: item.createdby,
-        createdAt: item.createdat,
-        updatedAt: item.updatedat
-    }));
+    let result = fromDbPayload(data || []) as any[];
 
     if (!isAdmin && userId) {
         result = result.filter((item: any) => {
-            const hiddenBy = Array.isArray(item.hiddenby) ? item.hiddenby : [];
+            const hiddenBy = Array.isArray(item.hiddenBy) ? item.hiddenBy : [];
             return !hiddenBy.includes(userId);
         });
     }
@@ -1470,23 +1508,10 @@ export async function getCapacitacionById(id: string) {
     const { data: cap, error: capError } = await supabase.from('capacitaciones').select('*').eq('id', id).single();
     if (capError) return null;
 
-    const { data: assistants, error: asisError } = await supabase.from('capacitacion_asistentes').select('*').eq('capacitacion_id', id);
-    
+    const { data: assistants, error: assistantsError } = await supabase.from('capacitacion_asistentes').select('*').eq('capacitacion_id', id);
+
     return {
-        ...cap,
-        supervisorName: cap.supervisorname,
-        horaInicio: cap.horainicio,
-        horaTermino: cap.horatermino,
-        firmaSupervisor: cap.firmasupervisor,
-        prevencionName: cap.prevencionname,
-        prevencionEmail: cap.prevencionemail,
-        signature_token: cap.signature_token,
-        token_expiry: cap.token_expiry,
-        prevencion_signature_url: cap.prevencion_signature_url,
-        prevencion_signature_date: cap.prevencion_signature_date,
-        createdBy: cap.createdby,
-        createdAt: cap.createdat,
-        updatedAt: cap.updatedat,
+        ...fromDbPayload(cap),
         assistants: assistants || []
     };
 }

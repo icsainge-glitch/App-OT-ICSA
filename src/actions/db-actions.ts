@@ -1329,7 +1329,19 @@ export async function getHPTs(userId?: string, isAdmin?: boolean) {
     let { data, error } = await query;
     if (error) throw error;
     
-    let result = data || [];
+    let result = (data || []).map((item: any) => ({
+        ...item,
+        projectId: item.projectid,
+        supervisorName: item.supervisorname,
+        supervisorRut: item.supervisorrut,
+        trabajoRealizar: item.trabajorealizar,
+        medidasSeguridad: item.medidasseguridad,
+        firmaSupervisor: item.firmasupervisor,
+        createdBy: item.createdby,
+        createdAt: item.createdat,
+        updatedAt: item.updatedat
+    }));
+
     if (!isAdmin && userId) {
         result = result.filter((item: any) => {
             const hiddenBy = Array.isArray(item.hiddenby) ? item.hiddenby : [];
@@ -1348,6 +1360,15 @@ export async function getHPTById(id: string) {
     
     return {
         ...hpt,
+        projectId: hpt.projectid,
+        supervisorName: hpt.supervisorname,
+        supervisorRut: hpt.supervisorrut,
+        trabajoRealizar: hpt.trabajorealizar,
+        medidasSeguridad: hpt.medidasseguridad,
+        firmaSupervisor: hpt.firmasupervisor,
+        createdBy: hpt.createdby,
+        createdAt: hpt.createdat,
+        updatedAt: hpt.updatedat,
         workers: workers || []
     };
 }
@@ -1418,7 +1439,23 @@ export async function getCapacitaciones(userId?: string, isAdmin?: boolean) {
     let { data, error } = await query;
     if (error) throw error;
     
-    let result = data || [];
+    let result = (data || []).map((item: any) => ({
+        ...item,
+        supervisorName: item.supervisorname,
+        horaInicio: item.horainicio,
+        horaTermino: item.horatermino,
+        firmaSupervisor: item.firmasupervisor,
+        prevencionName: item.prevencionname,
+        prevencionEmail: item.prevencionemail,
+        signature_token: item.signature_token,
+        token_expiry: item.token_expiry,
+        prevencion_signature_url: item.prevencion_signature_url,
+        prevencion_signature_date: item.prevencion_signature_date,
+        createdBy: item.createdby,
+        createdAt: item.createdat,
+        updatedAt: item.updatedat
+    }));
+
     if (!isAdmin && userId) {
         result = result.filter((item: any) => {
             const hiddenBy = Array.isArray(item.hiddenby) ? item.hiddenby : [];
@@ -1437,6 +1474,19 @@ export async function getCapacitacionById(id: string) {
     
     return {
         ...cap,
+        supervisorName: cap.supervisorname,
+        horaInicio: cap.horainicio,
+        horaTermino: cap.horatermino,
+        firmaSupervisor: cap.firmasupervisor,
+        prevencionName: cap.prevencionname,
+        prevencionEmail: cap.prevencionemail,
+        signature_token: cap.signature_token,
+        token_expiry: cap.token_expiry,
+        prevencion_signature_url: cap.prevencion_signature_url,
+        prevencion_signature_date: cap.prevencion_signature_date,
+        createdBy: cap.createdby,
+        createdAt: cap.createdat,
+        updatedAt: cap.updatedat,
         assistants: assistants || []
     };
 }
@@ -1467,7 +1517,13 @@ export async function submitCapacitacionRemoteSignature(input: {
 
         const { assistants, ...capWithoutAssistants } = updatedData;
 
-        const { error } = await supabase.from('capacitaciones').upsert(capWithoutAssistants);
+        // Clean payload: ensure only lowercase keys are sent to Supabase
+        const payload: any = {};
+        Object.keys(capWithoutAssistants).forEach(key => {
+            payload[key.toLowerCase()] = (capWithoutAssistants as any)[key];
+        });
+
+        const { error } = await supabase.from('capacitaciones').upsert(payload);
         if (error) throw error;
 
         revalidatePath('/capacitaciones');

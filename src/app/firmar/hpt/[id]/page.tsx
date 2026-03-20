@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { SignaturePad } from "@/components/SignaturePad";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, Loader2, User, Info, MapPin, Clock, MessageSquare, Users, ShieldCheck, Briefcase } from "lucide-react";
-import { getHPTById, submitHPTRemoteSignature } from "@/actions/db-actions";
+import { getHPTById, submitHPTRemoteSignature, getHPTQuestions } from "@/actions/db-actions";
 import { useActionData } from "@/hooks/use-action-data";
 import { formatFolio } from "@/lib/utils";
 
@@ -23,13 +23,14 @@ function HPTRemoteSignaturePageContent({ params }: { params: Promise<{ id: strin
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(false);
-  const [prevencionName, setPrevencionName] = useState("Departamento de Prevención");
+  const [prevencionName, setPrevencionName] = useState("José Mellado");
   const [signatureUrl, setSignatureUrl] = useState("");
   const [isValidating, setIsValidating] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const { data: hpt, isLoading: isHptLoading } = useActionData<any>(() => getHPTById(id), [id]);
+  const { data: questions } = useActionData<any[]>(getHPTQuestions, []);
 
   useEffect(() => {
     if (!isHptLoading) {
@@ -116,7 +117,7 @@ function HPTRemoteSignaturePageContent({ params }: { params: Promise<{ id: strin
         </div>
         <div className="space-y-2">
           <h1 className="text-2xl font-black text-primary uppercase">¡HPT Firmada!</h1>
-          <p className="text-muted-foreground font-medium">La HPT ha sido revisada y firmada exitosamente. El supervisor recibirá una copia en PDF.</p>
+          <p className="text-muted-foreground font-medium text-sm px-4">La HPT ha sido revisada y firmada exitosamente. Recibirá una copia en formato PDF en su correo electrónico (**{hpt?.prevencionEmail || hpt?.prevencionemail}**) para su respaldo.</p>
         </div>
       </div>
     );
@@ -176,23 +177,23 @@ function HPTRemoteSignaturePageContent({ params }: { params: Promise<{ id: strin
                 <Users className="h-3 w-3" /> Equipo de Trabajo ({hpt?.workers?.length || 0})
               </Label>
               <div className="border border-primary/10 rounded-2xl overflow-hidden shadow-inner overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="bg-primary/5 text-[10px] uppercase font-black text-muted-foreground">
+                <table className="w-full text-left text-[11px]">
+                  <thead className="bg-primary/5 text-[9px] uppercase font-black text-muted-foreground">
                     <tr>
-                      <th className="px-4 py-3">Nombre</th>
-                      <th className="px-4 py-3">Cargo</th>
-                      <th className="px-4 py-3 text-right">Firma</th>
+                      <th className="px-4 py-2">Nombre</th>
+                      <th className="px-4 py-2">Cargo</th>
+                      <th className="px-4 py-2 text-right">Firma</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-primary/5">
                     {hpt?.workers?.map((worker: any, idx: number) => (
                       <tr key={idx} className="bg-white hover:bg-muted/5 transition-colors">
-                        <td className="px-4 py-3 font-bold text-xs uppercase">{worker.nombre}</td>
-                        <td className="px-4 py-3 text-xs font-medium text-muted-foreground">{worker.cargo}</td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-2 font-bold uppercase">{worker.nombre}</td>
+                        <td className="px-4 py-2 font-medium text-muted-foreground">{worker.cargo}</td>
+                        <td className="px-4 py-2 text-right">
                           {worker.firma ? (
                             <div className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-600 uppercase">
-                              <CheckCircle2 className="h-3 w-3" /> Firmado
+                              <CheckCircle2 className="h-2 w-2" /> Firmado
                             </div>
                           ) : (
                             <span className="text-[9px] font-bold text-muted-foreground uppercase italic px-2">Pendiente</span>
@@ -203,6 +204,50 @@ function HPTRemoteSignaturePageContent({ params }: { params: Promise<{ id: strin
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* Detailed sections */}
+            <div className="grid grid-cols-1 gap-6">
+              {[
+                { title: "Recursos y Herramientas", data: hpt?.recursos, category: 'recursos', icon: <Briefcase className="h-3 w-3" /> },
+                { title: "Análisis de Riesgos", data: hpt?.riesgos, category: 'riesgos', icon: <Info className="h-3 w-3" /> },
+                { title: "Medidas de Seguridad", data: hpt?.medidas, category: 'medidas', icon: <ShieldCheck className="h-3 w-3" /> },
+                { title: "EPP Requerido", data: hpt?.epp, category: 'epp', icon: <ShieldCheck className="h-3 w-3" /> }
+              ].map((section, sidx) => {
+                if (!section.data || Object.keys(section.data).length === 0) return null;
+                
+                const sectionQuestions = questions?.filter((q: any) => q.category === section.category) || [];
+                
+                return (
+                  <div key={sidx} className="space-y-3">
+                    <Label className="uppercase text-[10px] font-black text-muted-foreground flex items-center gap-2">
+                      {section.icon} {section.title}
+                    </Label>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {sectionQuestions.map((q: any) => {
+                        const val = section.data[q.item_key];
+                        if (!val || val === 'N/A' || val === false) return null;
+                        
+                        return (
+                          <div key={q.item_key} className="flex items-start justify-between p-3 bg-muted/20 rounded-xl border border-black/5">
+                            <span className="text-[11px] font-bold text-primary max-w-[70%]">{q.label}</span>
+                            <span className="text-[10px] font-black uppercase text-primary/60">
+                              {typeof val === 'boolean' ? 'Sí' : val}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {/* Handle 'otros' in risks */}
+                      {section.category === 'riesgos' && section.data['otros'] && (
+                         <div className="flex flex-col p-3 bg-muted/20 rounded-xl border border-black/5 gap-1">
+                            <span className="text-[11px] font-black text-primary uppercase">Otros Riesgos:</span>
+                            <p className="text-[10px] font-medium text-muted-foreground italic">{section.data['otros']}</p>
+                         </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

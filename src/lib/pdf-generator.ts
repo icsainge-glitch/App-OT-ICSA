@@ -8,6 +8,10 @@ const LOGO_URL = "/icsa-logo.png";
 // Helper for browser-side DataURL conversion
 const toDataURL = (url: string): Promise<string> => {
   return new Promise((resolve, reject) => {
+    if (typeof XMLHttpRequest === 'undefined') {
+      reject(new Error("XMLHttpRequest not available"));
+      return;
+    }
     const xhr = new XMLHttpRequest();
     xhr.onload = function () {
       const reader = new FileReader();
@@ -22,6 +26,36 @@ const toDataURL = (url: string): Promise<string> => {
     xhr.send();
   });
 }
+
+/**
+ * Robustly loads the ICSA logo for server-side PDF generation.
+ * Falls back to empty string if not found or not on server.
+ */
+const loadServerLogo = (): string => {
+  if (typeof window !== 'undefined') return "";
+  
+  try {
+    const fs = eval('require("fs")');
+    const path = eval('require("path")');
+    // Try multiple possible paths for the logo in different environments
+    const possiblePaths = [
+      path.join(process.cwd(), 'public', 'icsa-logo.png'),
+      path.join(process.cwd(), '.next', 'server', 'public', 'icsa-logo.png'),
+      path.join(process.cwd(), 'icsa-logo.png')
+    ];
+
+    for (const logoPath of possiblePaths) {
+      if (fs.existsSync(logoPath)) {
+        const buffer = fs.readFileSync(logoPath);
+        return `data:image/png;base64,${buffer.toString('base64')}`;
+      }
+    }
+    console.warn("Could not find icsa-logo.png in any of the expected locations");
+  } catch (e) {
+    console.error("Error loading logo for server PDF:", e);
+  }
+  return "";
+};
 
 // Internal function to build the PDF content (shared between client and server)
 const buildPDF = async (doc: jsPDF, data: any, logoBase64?: string) => {
@@ -394,23 +428,7 @@ export const generateWorkOrderPDF = async (data: any) => {
 // Server-side PDF generation (returns Buffer)
 export const generateServerWorkOrderPDF = async (data: any): Promise<Buffer> => {
   const doc = new jsPDF();
-  let logoBase64 = "";
-
-  try {
-    // Use eval('require') to hide Node.js modules from the client-side bundler
-    if (typeof window === 'undefined') {
-      const fs = eval('require("fs")');
-      const path = eval('require("path")');
-      const logoPath = path.join(process.cwd(), 'public', 'icsa-logo.png');
-      
-      if (fs.existsSync(logoPath)) {
-        const buffer = fs.readFileSync(logoPath);
-        logoBase64 = `data:image/png;base64,${buffer.toString('base64')}`;
-      }
-    }
-  } catch (e) {
-    console.error("Error loading logo for server PDF:", e);
-  }
+  const logoBase64 = loadServerLogo();
 
   await buildPDF(doc, data, logoBase64);
   const pdfArrayBuffer = doc.output('arraybuffer');
@@ -726,22 +744,7 @@ export const generateHPTPDF = async (data: any, questions: any[] = []) => {
 // Server-side HPT PDF generation (returns Buffer)
 export const generateServerHPTPDF = async (data: any, questions: any[] = []): Promise<Buffer> => {
   const doc = new jsPDF();
-  let logoBase64 = "";
-
-  try {
-    if (typeof window === 'undefined') {
-      const fs = eval('require("fs")');
-      const path = eval('require("path")');
-      const logoPath = path.join(process.cwd(), 'public', 'icsa-logo.png');
-      
-      if (fs.existsSync(logoPath)) {
-        const buffer = fs.readFileSync(logoPath);
-        logoBase64 = `data:image/png;base64,${buffer.toString('base64')}`;
-      }
-    }
-  } catch (e) {
-    console.error("Error loading logo for server HPT PDF:", e);
-  }
+  const logoBase64 = loadServerLogo();
 
   await buildHPTPDF(doc, data, questions, logoBase64);
   const pdfArrayBuffer = doc.output('arraybuffer');
@@ -766,8 +769,18 @@ const buildHPTPDF = async (doc: jsPDF, data: any, questions: any[] = [], logoBas
     if (logoBase64) {
         try { 
           // Box is (margin to 55), logo is 35x12 centered in it
-          doc.addImage(logoBase64, "PNG", margin + 5, 11.5, 35, 12); 
-        } catch(e){}
+          doc.addImage(logoBase64, "PNG", margin + 5, 11.5, 35, 12, undefined, 'FAST'); 
+        } catch(e){
+          doc.setTextColor(56, 163, 165);
+          doc.setFontSize(16);
+          doc.setFont("helvetica", "bold");
+          doc.text("ICSA", margin + 10, 19);
+        }
+    } else {
+      doc.setTextColor(56, 163, 165);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("ICSA", margin + 10, 19);
     }
     doc.setDrawColor(0);
     doc.setLineWidth(0.1);

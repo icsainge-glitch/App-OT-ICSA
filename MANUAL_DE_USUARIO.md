@@ -11,9 +11,10 @@ El objetivo de esta aplicación es digitalizar, agilizar y transparentar la crea
 2. [Navegación y Panel Principal (Dashboard)](#2-navegación-y-panel-principal)
 3. [Órdenes de Trabajo (OTs)](#3-órdenes-de-trabajo-ots)
 4. [Gestión de Proyectos](#4-gestión-de-proyectos)
-5. [Control de Herramientas e Inventario](#5-control-de-herramientas-e-inventario)
-6. [Administración (Solo Administradores)](#6-administración-solo-administradores)
-7. [Mejores Prácticas y Consejos](#7-mejores-prácticas-y-consejos)
+5. [Seguridad en Faena (HPT y Charlas)](#5-seguridad-en-faena-hpt-y-charlas)
+6. [Control de Herramientas e Inventario](#6-control-de-herramientas-e-inventario)
+7. [Administración (Solo Administradores)](#7-administración-solo-administradores)
+8. [Mejores Prácticas y Consejos](#8-mejores-prácticas-y-consejos)
 
 ---
 
@@ -83,7 +84,29 @@ Los Proyectos agrupan a múltiples trabajadores y a muchas Órdenes de Trabajo (
 
 ---
 
-## 5. Control de Herramientas e Inventario
+## 5. Seguridad en Faena (HPT y Charlas)
+
+El portal permite digitalizar los registros de seguridad obligatorios, asegurando que se cumplan las normativas antes de iniciar cualquier labor técnica.
+
+### Hoja de Planificación del Trabajo (HPT)
+La HPT es obligatoria y debe realizarse **antes** de comenzar los trabajos en terreno.
+1. **Creación**: Disponible desde el menú principal o directamente desde la sección "HPT".
+2. **Registro de Riesgos**: Se deben identificar los riesgos (atrapamiento, caídas, eléctricos, etc.) y las medidas de control que se aplicarán.
+3. **Equipo de Trabajo**: Permite registrar a todos los trabajadores involucrados en la tarea específica.
+4. **Firma y Validación**:
+    * **Supervisor**: El supervisor a cargo firma directamente en el dispositivo.
+    * **Prevención de Riesgos**: El sistema permite enviar una **Solicitud de Firma Remota** al Departamento de Prevención. Una vez que Prevención firma digitalmente desde su correo, el documento se considera Completado.
+5. **Respaldo Automático**: Al completarse la firma de Prevención, el sistema enviará automáticamente un correo con el **documento PDF oficial** adjunto al responsable de seguridad.
+
+### Charlas de Seguridad (Capacitación)
+Permite dejar registro de las inducciones diarias o específicas realizadas al equipo.
+1. **Temario**: Se registra el tema tratado en la charla.
+2. **Asistencia**: Se agregan los asistentes y se recolecta su firma directamente en la pantalla del dispositivo.
+3. **Validación**: Al igual que la HPT, el registro de charla genera un PDF oficial con todas las firmas recolectadas para respaldo de la obra.
+
+---
+
+## 6. Control de Herramientas e Inventario
 
 Para evitar la pérdida o el mal manejo de los activos de la empresa, el portal cuenta con un sistema rápido de asignación en terreno.
 
@@ -101,7 +124,7 @@ Cada asignación ("Retiro") y Devolución genera un registro histórico inmutabl
 
 ---
 
-## 6. Administración (Solo Administradores)
+## 7. Administración (Solo Administradores)
 
 Si tu rol es Administrador, tendrás menús exclusivos para llevar el pilar de la plataforma:
 
@@ -111,7 +134,7 @@ Si tu rol es Administrador, tendrás menús exclusivos para llevar el pilar de l
 
 ---
 
-## 7. Mejores Prácticas y Consejos
+## 8. Mejores Prácticas y Consejos
 
 *   **Internet Móvil:** El portal comprime fuertemente las imágenes de forma automática antes de intentar subirlas (ahorrando tiempo y plan de datos). Sin embargo, siempre intenta subir tus evidencias cuando poseas una señal 3G/4G/5G estable.
 *   **Descargas PDF:** Si vas a compartir múltiples Actas o reportes a través de WhatsApp, te recomendamos descargarlos primero en tu dispositivo, revisarlos y luego enviarlos como Archivo Externo.

@@ -1670,7 +1670,7 @@ export async function submitHPTRemoteSignature(input: {
         if (error) throw error;
 
         // Trigger email sending flow
-        sendHPTEmail({ hptId: input.id }).catch(e => console.error("Error triggering HPT email flow:", e));
+        await sendHPTEmail({ hptId: input.id }).catch(e => console.error("Error triggering HPT email flow:", e));
 
         revalidatePath('/hpt');
         revalidatePath(`/hpt/${input.id}`);

@@ -764,7 +764,10 @@ const buildHPTPDF = async (doc: jsPDF, data: any, questions: any[] = [], logoBas
 
   const drawHeader = (page: number) => {
     if (logoBase64) {
-        try { doc.addImage(logoBase64, "PNG", margin, 10, 40, 15); } catch(e){}
+        try { 
+          // Box is (margin to 55), logo is 35x12 centered in it
+          doc.addImage(logoBase64, "PNG", margin + 5, 11.5, 35, 12); 
+        } catch(e){}
     }
     doc.setDrawColor(0);
     doc.setLineWidth(0.1);
@@ -774,12 +777,14 @@ const buildHPTPDF = async (doc: jsPDF, data: any, questions: any[] = [], logoBas
     
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text("HOJA DE PLANIFICACIÓN DEL TRABAJO (HPT)", 125, 18, { align: "center" });
+    // Center of main area (55 to pageWidth-50)
+    const titleCenter = (55 + (pageWidth - 50)) / 2;
+    doc.text("HOJA DE PLANIFICACIÓN DEL TRABAJO (HPT)", titleCenter, 18.5, { align: "center" });
     
     doc.setFontSize(7);
-    doc.text("ICSA-SSOC-002 HPT", pageWidth - 12, 13, { align: "right" });
-    doc.text("Ver 1.0 2026", pageWidth - 12, 18, { align: "right" });
-    doc.text(`Página ${page} de 2`, pageWidth - 12, 23, { align: "right" });
+    doc.text("ICSA-SSOC-002 HPT", pageWidth - 14, 13, { align: "right" });
+    doc.text("Ver 1.0 2026", pageWidth - 14, 18, { align: "right" });
+    doc.text(`Página ${page} de 2`, pageWidth - 14, 23, { align: "right" });
   };
 
   // --- PAGE 1 ---
@@ -793,7 +798,7 @@ const buildHPTPDF = async (doc: jsPDF, data: any, questions: any[] = [], logoBas
       ['Proyecto', data.projectName || data.projectname || 'General / Sin Proyecto'],
       ['Supervisor a cargo:', data.supervisorName || data.supervisorname || 'N/A', 'FIRMA', ''],
       ['Rut', data.supervisorRut || data.supervisorrut || 'N/A', '', ''],
-      ['Fecha:', data.fecha ? new Date(data.fecha).toLocaleDateString('es-CL') : 'N/A', '', '']
+      ['Fecha:', data.fecha ? new Date(data.fecha).toLocaleDateString('es-CL', { timeZone: 'UTC' }) : 'N/A', '', '']
     ],
     theme: 'grid',
     styles: { fontSize: 8, cellPadding: 2 },
@@ -815,43 +820,33 @@ const buildHPTPDF = async (doc: jsPDF, data: any, questions: any[] = [], logoBas
 
   currentY = (doc as any).lastAutoTable.finalY;
 
-  // Team Table
-  autoTable(doc, {
-    startY: currentY,
-    head: [['EQUIPO DE TRABAJO', { content: 'FIRMAS', colSpan: 1 }]],
-    headStyles: { fillColor: [80, 80, 80], halign: 'center', fontSize: 8 },
-    theme: 'grid'
-  });
-  
+  // Team Table - Only show workers if they exist
   const workers = data.workers || [];
-  const workerRows = [];
-  for(let i=0; i<10; i++) {
-    const w = workers[i];
-    workerRows.push([
-      `Nombre Trabajador: ${w?.nombre || ''}`,
-      `RUT: ${w?.rut || ''}`,
-      `Cargo: ${w?.cargo || ''}`,
-      ''
-    ]);
-  }
-
-  autoTable(doc, {
-    startY: (doc as any).lastAutoTable.finalY,
-    body: workerRows,
-    theme: 'grid',
-    styles: { fontSize: 7, cellPadding: 1, minCellHeight: 8 },
-    columnStyles: { 0: { cellWidth: 50 }, 1: { cellWidth: 40 }, 2: { cellWidth: 40 }, 3: { cellWidth: 60 } },
-    didDrawCell: (cellData) => {
-      if (cellData.section === 'body' && cellData.column.index === 3) {
-        const w = workers[cellData.row.index];
-        if (w?.firma) {
-          try { doc.addImage(w.firma, 'PNG', cellData.cell.x + 10, cellData.cell.y + 1, 40, 6); } catch(e){}
+  if (workers.length > 0) {
+    autoTable(doc, {
+      startY: currentY,
+      head: [['EQUIPO DE TRABAJO', 'RUT', 'CARGO', 'FIRMAS']],
+      headStyles: { fillColor: [80, 80, 80], halign: 'center', fontSize: 8 },
+      theme: 'grid',
+      body: workers.map((w: any) => [
+        `Nombre: ${w?.nombre || ''}`,
+        `RUT: ${w?.rut || ''}`,
+        `Cargo: ${w?.cargo || ''}`,
+        ''
+      ]),
+      styles: { fontSize: 7, cellPadding: 1, minCellHeight: 8 },
+      columnStyles: { 0: { cellWidth: 50 }, 1: { cellWidth: 40 }, 2: { cellWidth: 40 }, 3: { cellWidth: 60, halign: 'center' } },
+      didDrawCell: (cellData) => {
+        if (cellData.section === 'body' && cellData.column.index === 3) {
+          const w = workers[cellData.row.index];
+          if (w?.firma) {
+            try { doc.addImage(w.firma, 'PNG', cellData.cell.x + 10, cellData.cell.y + 1, 40, 6); } catch(e){}
+          }
         }
       }
-    }
-  });
-
-  currentY = (doc as any).lastAutoTable.finalY;
+    });
+    currentY = (doc as any).lastAutoTable.finalY;
+  }
 
   // Resources Table
   doc.setFontSize(8);

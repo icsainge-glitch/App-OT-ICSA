@@ -710,16 +710,22 @@ export const generateBatchReturnActPDF = async (movements: any[]) => {
 };
 
 // --- HPT PDF GENERATOR ---
-export const generateHPTPDF = async (data: any) => {
+export const generateHPTPDF = async (data: any, questions: any[] = []) => {
   const doc = new jsPDF();
-  const primaryColor: [number, number, number] = [56, 163, 165];
-  const darkGray: [number, number, number] = [40, 40, 40];
   const margin = 10;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   let logoBase64 = "";
 
   try { logoBase64 = await toDataURL(LOGO_URL); } catch (e) { }
+
+  // Group questions by category for lookup
+  const qMap: Record<string, any[]> = { recursos: [], riesgos: [], medidas: [], epp: [] };
+  if (questions && questions.length > 0) {
+    questions.forEach(q => {
+      if (qMap[q.category]) qMap[q.category].push(q);
+    });
+  }
 
   const drawHeader = (page: number) => {
     if (logoBase64) doc.addImage(logoBase64, "PNG", margin, 10, 40, 15);
@@ -747,10 +753,10 @@ export const generateHPTPDF = async (data: any) => {
   autoTable(doc, {
     startY: currentY,
     body: [
-      ['Proyecto', data.projectName || 'General / Sin Proyecto'],
-      ['Supervisor a cargo:', data.supervisorName || 'N/A', 'FIRMA', ''],
-      ['Rut', data.supervisorRut || 'N/A', '', ''],
-      ['Fecha:', new Date(data.fecha).toLocaleDateString('es-CL'), '', '']
+      ['Proyecto', data.projectName || data.projectname || 'General / Sin Proyecto'],
+      ['Supervisor a cargo:', data.supervisorName || data.supervisorname || 'N/A', 'FIRMA', ''],
+      ['Rut', data.supervisorRut || data.supervisorrut || 'N/A', '', ''],
+      ['Fecha:', data.fecha ? new Date(data.fecha).toLocaleDateString('es-CL') : 'N/A', '', '']
     ],
     theme: 'grid',
     styles: { fontSize: 8, cellPadding: 2 },
@@ -762,8 +768,9 @@ export const generateHPTPDF = async (data: any) => {
     },
     didDrawCell: (cellData) => {
        if (cellData.section === 'body' && cellData.column.index === 3 && cellData.row.index === 1) {
-         if (data.firmaSupervisor) {
-           try { doc.addImage(data.firmaSupervisor, 'PNG', cellData.cell.x + 5, cellData.cell.y + 1, 40, 10); } catch(e){}
+         const sig = data.firmaSupervisor || data.firmasupervisor;
+         if (sig) {
+           try { doc.addImage(sig, 'PNG', cellData.cell.x + 5, cellData.cell.y + 1, 40, 10); } catch(e){}
          }
        }
     }
@@ -780,7 +787,7 @@ export const generateHPTPDF = async (data: any) => {
   });
   
   const workerRows = [];
-  for(let i=0; i<6; i++) {
+  for(let i=0; i<10; i++) {
     const w = data.workers?.[i];
     workerRows.push([
       `Nombre Trabajador: ${w?.nombre || ''}`,
@@ -814,32 +821,33 @@ export const generateHPTPDF = async (data: any) => {
   doc.setFillColor(80, 80, 80);
   doc.setTextColor(255, 255, 255);
   doc.rect(margin, currentY, pageWidth - margin * 2, 6, 'F');
-  doc.text("RECURSOS / COORDINACIÓN / PERMISOS (SI es NO, corregir el estado del item antes de iniciar la tarea)", margin + 2, currentY + 4);
+  doc.text("RECURSOS / COORDINACIÓN / PERMISOS - (SI es NO, Corregir antes de iniciar)", margin + 2, currentY + 4);
   currentY += 6;
 
-  const resData = [
-    { id: 'personal', n: '1', label: '¿Se cuenta con el personal necesario y entrenado según el procedimiento de trabajo ICSA?' },
-    { id: 'equipos', n: '2', label: '¿Se cuenta con los Equipos, Herramientas necesarias, y estos se encuentran en buen estado de uso?' },
-    { id: 'materiales', n: '3', label: '¿Se dispone de los materiales, repuestos e insumos necesarios?' },
-    { id: 'coordinacionC', n: '4', label: '¿Se realizó coordinaciones necesarias con cliente para acceder a las zonas de trabajo?' },
-    { id: 'bloqueo', n: '5', label: '¿Se coordinó bloqueo de seguridad y/o líneas (Eléctricas, Hidráulicas, etc.)?' },
-    { id: 'permisoC', n: '6', label: '¿Se solicitó el permiso de ingreso al personal de prevención de riesgos cliente?' }
-  ];
+  // Filter items: active OR already in data
+  const resItems = qMap.recursos.length > 0 
+    ? qMap.recursos.filter(q => q.active || data.recursos?.[q.item_key])
+    : [
+        { item_key: 'personal', label: '1. ¿Se cuenta con el personal necesario y entrenado?' },
+        { item_key: 'equipos', label: '2. ¿Se cuenta con los Equipos y Herramientas necesarias?' },
+        { item_key: 'materiales', label: '3. ¿Se dispone de los materiales e insumos necesarios?' },
+        { item_key: 'coordinacionC', label: '4. ¿Se realizó coordinaciones con cliente?' },
+        { item_key: 'bloqueo', label: '5. ¿Se coordinó bloqueo de seguridad?' },
+        { item_key: 'permisoC', label: '6. ¿Se solicitó el permiso de ingreso?' }
+      ];
 
   const resRows = [];
-  for(let i=0; i<3; i++) {
-    const left = resData[i];
-    const right = resData[i+3];
-    const getSNN = (obj: any, id: string) => {
-      const val = obj?.[id];
+  const resHalf = Math.ceil(resItems.length / 2);
+  for(let i=0; i < resHalf; i++) {
+    const left = resItems[i];
+    const right = resItems[i + resHalf];
+    const getSNN = (obj: any, key: string) => {
+      const val = obj?.[key];
       return [val === 'SI' ? 'X' : '', val === 'NO' ? 'X' : '', val === 'N/A' ? 'X' : ''];
     };
-    const lSNN = getSNN(data.recursos, left.id);
-    const rSNN = getSNN(data.recursos, right.id);
-
     resRows.push([
-      left.n, left.label, ...lSNN, 
-      right.n, right.label, ...rSNN
+      (i+1).toString(), left.label, ...getSNN(data.recursos, left.item_key),
+      right ? (i + resHalf + 1).toString() : '', right ? right.label : '', ...(right ? getSNN(data.recursos, right.item_key) : ['', '', ''])
     ]);
   }
 
@@ -856,7 +864,7 @@ export const generateHPTPDF = async (data: any) => {
     }
   });
 
-  currentY = (doc as any).lastAutoTable.finalY;
+  currentY = (doc as any).lastAutoTable.finalY + 2;
 
   // Work Description
   doc.setFontSize(8);
@@ -864,15 +872,15 @@ export const generateHPTPDF = async (data: any) => {
   doc.setFillColor(80, 80, 80);
   doc.setTextColor(255, 255, 255);
   doc.rect(margin, currentY, pageWidth - margin * 2, 6, 'F');
-  doc.text("TRABAJO A REALIZAR ¿ Cómo Ejecutaré Mi trabajo?", margin + 2, currentY + 4);
+  doc.text("TRABAJO A REALIZAR ¿Cómo Ejecutaré Mi trabajo?", margin + 2, currentY + 4);
   currentY += 6;
 
   doc.setDrawColor(0);
   doc.setLineWidth(0.1);
   doc.setTextColor(0);
   doc.setFont("helvetica", "normal");
-  const splitJob = doc.splitTextToSize(data.trabajoRealizar || '', pageWidth - margin * 2 - 4);
-  doc.rect(margin, currentY, pageWidth - margin * 2, 40);
+  const splitJob = doc.splitTextToSize(data.trabajoRealizar || data.trabajorealizar || '', pageWidth - margin * 2 - 4);
+  doc.rect(margin, currentY, pageWidth - margin * 2, 35);
   doc.text(splitJob, margin + 2, currentY + 5);
 
   // --- PAGE 2 ---
@@ -886,47 +894,36 @@ export const generateHPTPDF = async (data: any) => {
   doc.setFillColor(80, 80, 80);
   doc.setTextColor(255, 255, 255);
   doc.rect(margin, currentY, pageWidth - margin * 2, 6, 'F');
-  doc.text("IDENTIFICACIÓN DE ACCIDENTES POTENCIALES O RIESGOS ASOCIADOS ¿ Qué me puede ocurrir, estoy expuesto, SI o NO?", margin + 2, currentY + 4);
+  doc.text("IDENTIFICACIÓN DE RIESGOS ¿Qué me puede ocurrir?", margin + 2, currentY + 4);
   currentY += 6;
 
-  const riskItems = [
-    { id: 'aprisionamiento', n: '1', label: 'Aprisionamiento. Tableros, máquinas o equipos en movimiento...' },
-    { id: 'atrapamiento', n: '2', label: 'Atrapamiento de o parte de todo el cuerpo por objetos...' },
-    { id: 'caidaMismo', n: '3', label: 'Caída al mismo nivel. Ej: caminar en áreas con agua, hielo...' },
-    { id: 'caidaDistinto', n: '4', label: 'Caída a distinto nivel. Ej: caídas desde Caballetes, andamios...' },
-    { id: 'energiaE', n: '5', label: 'Contacto con energía eléctrica. Ej: comando, tableros generales...' },
-    { id: 'fluidosP', n: '6', label: 'Contacto con fluidos a presión. Ej: agua, aire, gases, vapor, etc' },
-    { id: 'sustanciasT', n: '7', label: 'Contacto con sust. Tóxicas. Ej: Cloro, Flúor, Ácido Sulfúrico...' },
-    { id: 'temperaturas', n: '8', label: 'Contacto con Temperaturas Extremas. Ej: calor o frío...' },
-    { id: 'estadoP', n: '9', label: 'Estado Personal, Estoy en buenas condic. Físicas y Psicológicas...' },
-    { id: 'radiacion', n: '10', label: 'Exposición a. Ej: Radiación Ultravioleta, ruidos, gases...' },
-    { id: 'golpeadoC', n: '11', label: 'Golpeado con o Contra Herramientas. Objeto, estructuras...' },
-    { id: 'golpeadoO', n: '12', label: 'Golpeado por objetos en mov. Ej: camión grúa, caída de materiales...' },
-    { id: 'atropellado', n: '13', label: 'Atropellado Por Vehículo, Maquinaria u Equipo en Movimiento.' },
-    { id: 'inmersion', n: '14', label: 'Por Inmersión (asfixia). Ej: Ingreso al agua, recintos cerrados...' },
-    { id: 'sobreesfuerzo', n: '15', label: 'Sobreesfuerzo. Ej: levantar carga sin ayuda o equipos de levante.' },
-    { id: 'cargasS', n: '16', label: 'Cargas Suspendidas. Ej: exposición bajo cargas.' },
-    { id: 'incendioE', n: '17', label: 'Incendios, Explosión, Derrames, Choques, Volcamientos, etc.' },
-    { id: 'otros', n: '18', label: 'Otros: Supervisor debe llenar este item solo si aplica' }
-  ];
+  const riskItems = qMap.riesgos.length > 0 
+    ? qMap.riesgos.filter(q => q.active || data.riesgos?.[q.item_key])
+    : [
+        { item_key: 'atrapamiento', label: 'Atrapamiento' },
+        { item_key: 'caidaMismo', label: 'Caída al mismo nivel' },
+        { item_key: 'caidaDistinto', label: 'Caída a distinto nivel' },
+        { item_key: 'energiaE', label: 'Energía Eléctrica' }
+      ];
 
   const riskRows = [];
-  for(let i=0; i<9; i++) {
+  const riskHalf = Math.ceil(riskItems.length / 2);
+  for(let i=0; i < riskHalf; i++) {
     const left = riskItems[i];
-    const right = riskItems[i+9];
-    const getSNN = (obj: any, id: string) => {
-      const val = obj?.[id];
+    const right = riskItems[i + riskHalf];
+    const getSNN = (obj: any, key: string) => {
+      const val = obj?.[key];
       return [val === 'SI' ? 'X' : '', val === 'NO' ? 'X' : '', val === 'N/A' ? 'X' : ''];
     };
     riskRows.push([
-      left.n, left.label, ...getSNN(data.riesgos, left.id),
-      right.n, right.label, ...getSNN(data.riesgos, right.id)
+      (i+1).toString(), left.label, ...getSNN(data.riesgos, left.item_key),
+      right ? (i + riskHalf + 1).toString() : '', right ? right.label : '', ...(right ? getSNN(data.riesgos, right.item_key) : ['', '', ''])
     ]);
   }
 
   autoTable(doc, {
     startY: currentY,
-    head: [['N°', 'IDENTIFICACIÓN', 'SI', 'NO', 'N/A', 'N°', 'IDENTIFICACIÓN', 'SI', 'NO', 'N/A']],
+    head: [['N°', 'RIESGO', 'SI', 'NO', 'N/A', 'N°', 'RIESGO', 'SI', 'NO', 'N/A']],
     body: riskRows,
     theme: 'grid',
     styles: { fontSize: 5.5, cellPadding: 0.8 },
@@ -937,7 +934,12 @@ export const generateHPTPDF = async (data: any) => {
     }
   });
 
-  currentY = (doc as any).lastAutoTable.finalY;
+  currentY = (doc as any).lastAutoTable.finalY + 2;
+  if (data.riesgos?.otros) {
+    doc.setFontSize(6);
+    doc.text(`Otros Riesgos: ${data.riesgos.otros}`, margin, currentY + 3);
+    currentY += 5;
+  }
 
   // Measures Table
   doc.setFontSize(8);
@@ -945,46 +947,33 @@ export const generateHPTPDF = async (data: any) => {
   doc.setFillColor(80, 80, 80);
   doc.setTextColor(255, 255, 255);
   doc.rect(margin, currentY, pageWidth - margin * 2, 6, 'F');
-  doc.text("IDENTIFICACIÓN DE LAS MEDIDAS DE SEGURIDAD", margin + 2, currentY + 4);
+  doc.text("MEDIDAS DE SEGURIDAD", margin + 2, currentY + 4);
   currentY += 6;
 
-  const measureItems = [
-    { id: 'limpiesa', n: '1', label: 'El área de trabajo está limpia, ordenada y con accesos expeditos.' },
-    { id: 'iluminacion', n: '2', label: 'El área dispone de la iluminación requerida para la tarea a realizar.' },
-    { id: 'ventilacion', n: '3', label: 'El área de trabajo dispone de la ventilación requerida para la tarea.' },
-    { id: 'electricas', n: '4', label: 'Las instalaciones eléctricas portátiles se encuentran en buen estado.' },
-    { id: 'superficies', n: '5', label: 'Las superficies de trabajo se encuentran en buenas condiciones.' },
-    { id: 'delimitada', n: '6', label: 'Está delimitada la zona la zona de bloqueo y movimientos de equipos.' },
-    { id: 'controlL', n: '7', label: 'Se verifica el control local de los bloqueos del o los equipos...' },
-    { id: 'enclavamiento', n: '8', label: 'Se verifica el enclavamiento mecánico de andamios, andamio escala...' },
-    { id: 'eppAdecuado', n: '9', label: 'Se verifica la utilización de los EPP adecuados y en buen estado.' },
-    { id: 'arnes', n: '10', label: 'Se utilizan arnés de seguridad sobre 1,5 mt.' },
-    { id: 'fueraCarga', n: '11', label: 'Los trabajadores se ubican fuera del área de carga suspendida...' },
-    { id: 'izajes', n: '12', label: 'Se utilizan equipos de izajes y de traslado de materiales en buen estado.' },
-    { id: 'evitarIncendio', n: '13', label: 'Se implementan medidas para evitar un incendio en el área.' },
-    { id: 'zonaSeguridad', label: '14. El área cuenta con zona de seguridad en caso de emergencias.' }
-  ];
-
+  const measureItems = qMap.medidas.length > 0 
+    ? qMap.medidas.filter(q => q.active || data.medidas?.[q.item_key])
+    : [];
   const measureRows = [];
-  for(let i=0; i<7; i++) {
+  const measureHalf = Math.ceil(measureItems.length / 2);
+  for(let i=0; i < measureHalf; i++) {
     const left = measureItems[i];
-    const right = measureItems[i+7];
-    const getSNN = (obj: any, id: string) => {
-      const val = obj?.[id];
+    const right = measureItems[i + measureHalf];
+    const getSNN = (obj: any, key: string) => {
+      const val = obj?.[key];
       return [val === 'SI' ? 'X' : '', val === 'NO' ? 'X' : '', val === 'N/A' ? 'X' : ''];
     };
     measureRows.push([
-      left.n || '', left.label, ...getSNN(data.medidas, left.id),
-      right.n || (i+8).toString(), right.label, ...getSNN(data.medidas, right.id)
+      (i+1).toString(), left.label, ...getSNN(data.medidas, left.item_key),
+      right ? (i + measureHalf + 1).toString() : '', right ? right.label : '', ...(right ? getSNN(data.medidas, right.item_key) : ['', '', ''])
     ]);
   }
 
   autoTable(doc, {
     startY: currentY,
-    head: [['N°', 'IDENTIFICACIÓN', 'SI', 'NO', 'N/A', 'N°', 'IDENTIFICACIÓN', 'SI', 'NO', 'N/A']],
+    head: [['N°', 'MEDIDA', 'SI', 'NO', 'N/A', 'N°', 'MEDIDA', 'SI', 'NO', 'N/A']],
     body: measureRows,
     theme: 'grid',
-    styles: { fontSize: 5.5, cellPadding: 1 },
+    styles: { fontSize: 5.5, cellPadding: 0.8 },
     headStyles: { fillColor: [240, 240, 240], textColor: 0, halign: 'center' },
     columnStyles: { 
       0: { cellWidth: 5 }, 1: { cellWidth: 60 }, 2: { cellWidth: 8, halign: 'center' }, 3: { cellWidth: 8, halign: 'center' }, 4: { cellWidth: 8, halign: 'center' },
@@ -992,7 +981,7 @@ export const generateHPTPDF = async (data: any) => {
     }
   });
 
-  currentY = (doc as any).lastAutoTable.finalY;
+  currentY = (doc as any).lastAutoTable.finalY + 2;
 
   // EPP Table
   doc.setFontSize(8);
@@ -1000,58 +989,49 @@ export const generateHPTPDF = async (data: any) => {
   doc.setFillColor(80, 80, 80);
   doc.setTextColor(255, 255, 255);
   doc.rect(margin, currentY, pageWidth - margin * 2, 6, 'F');
-  doc.text("EQUIPOS DE PROTECCIÓN Y ELEMENTOS DE SEGURIDAD REQUERIDOS PARA LA TAREA", margin + 2, currentY + 4);
+  doc.text("EPP Y ELEMENTOS DE SEGURIDAD REQUERIDOS", margin + 2, currentY + 4);
   currentY += 6;
 
-  const eppItems = [
-    { id: 'casco', label: 'Casco de Seguridad' },
-    { id: 'lentes', label: 'Lentes de Seguridad' },
-    { id: 'calzado', label: 'Calzado de Seguridad' },
-    { id: 'respiratorio', label: 'Protector Respiratorio' },
-    { id: 'careta', label: 'Careta Facial' },
-    { id: 'guantes', label: 'Guantes de seguridad' },
-    { id: 'legionario', label: 'Legionario' },
-    { id: 'barbiquejo', label: 'Barbiquejo' },
-    { id: 'auditivo', label: 'Protector Auditivo' },
-    { id: 'soldar', label: 'Máscara soldar' },
-    { id: 'solar', label: 'Protector solar' },
-    { id: 'arnesY', label: 'Arnés Seguridad y Cabo de Vida tipo Y' }
-  ];
-
+  const eppItems = qMap.epp.length > 0 
+    ? qMap.epp.filter(q => q.active || data.epp?.[q.item_key])
+    : [];
   const eppRows = [];
-  for(let i=0; i<3; i++) {
-    const r = [];
-    for(let j=0; j<4; j++) {
-      const item = eppItems[i + j*3];
-      if(item) {
-        r.push(data.epp?.[item.id] ? '[X]' : '[ ]');
-        r.push(item.label);
-      } else {
-        r.push(''); r.push('');
-      }
-    }
-    eppRows.push(r);
+  const eppThird = Math.ceil(eppItems.length / 3);
+  for(let i=0; i < eppThird; i++) {
+    const c1 = eppItems[i];
+    const c2 = eppItems[i + eppThird];
+    const c3 = eppItems[i + eppThird * 2];
+    const getX = (key: string) => data.epp?.[key] ? '[X]' : '[ ]';
+    eppRows.push([
+      c1 ? `${getX(c1.item_key)} ${c1.label}` : '',
+      c2 ? `${getX(c2.item_key)} ${c2.label}` : '',
+      c3 ? `${getX(c3.item_key)} ${c3.label}` : ''
+    ]);
   }
 
   autoTable(doc, {
     startY: currentY,
     body: eppRows,
-    theme: 'grid',
-    styles: { fontSize: 6, cellPadding: 1 },
-    columnStyles: { 
-      0: { cellWidth: 8, halign: 'center' }, 1: { cellWidth: 35 },
-      2: { cellWidth: 8, halign: 'center' }, 3: { cellWidth: 35 },
-      4: { cellWidth: 8, halign: 'center' }, 5: { cellWidth: 35 },
-      6: { cellWidth: 8, halign: 'center' }, 7: { cellWidth: 35 }
-    }
+    theme: 'plain',
+    styles: { fontSize: 6, cellPadding: 0.5 },
+    columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: 60 }, 2: { cellWidth: 60 } }
   });
 
-  currentY = (doc as any).lastAutoTable.finalY;
-  doc.setFontSize(7);
-  doc.setTextColor(0);
-  doc.text(`Otros: ${data.epp?.otros || ''}`, margin + 2, currentY + 5);
+  currentY = (doc as any).lastAutoTable.finalY + 10;
+  
+  // Final Signature
+  const sigX = pageWidth / 2;
+  doc.line(sigX - 30, currentY + 15, sigX + 30, currentY + 15);
+  doc.setFontSize(8);
+  doc.text("FIRMA FINAL SUPERVISOR", sigX, currentY + 20, { align: "center" });
+  doc.text(data.supervisorName || "", sigX, currentY + 24, { align: "center" });
+  
+  const fsig = data.firmaSupervisor || data.firmasupervisor;
+  if(fsig) {
+    try { doc.addImage(fsig, 'PNG', sigX - 25, currentY - 5, 50, 18); } catch(e){}
+  }
 
-  doc.save(`HPT-${data.folio}-${new Date(data.fecha).toISOString().split('T')[0]}.pdf`);
+  doc.save(`HPT-${data.folio || '000'}-${new Date(data.fecha || Date.now()).toISOString().split('T')[0]}.pdf`);
 };
 
 // --- CHARLA PDF GENERATOR ---

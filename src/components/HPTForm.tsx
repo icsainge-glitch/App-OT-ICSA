@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,11 +14,11 @@ import { SignaturePad } from "@/components/SignaturePad";
 import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, ArrowRight, Save, User, Briefcase, 
-  CheckCircle2, Plus, Trash2, Shield, AlertTriangle, 
+  CheckCircle2, Plus, Trash2, Shield, ShieldCheck, AlertTriangle, 
   Wrench, Users, Camera, X, Loader2, Search, Check
 } from "lucide-react";
 import { useUser, useUserProfile } from "@/lib/auth-provider";
-import { getActiveProjects, saveHPT, getNextFolioHPT, getPersonnel } from "@/actions/db-actions";
+import { getActiveProjects, saveHPT, getNextFolioHPT, getPersonnel, getHPTQuestions } from "@/actions/db-actions";
 import { useActionData } from "@/hooks/use-action-data";
 import {
   Dialog,
@@ -64,70 +64,58 @@ export function HPTForm({ initialData }: { initialData?: any }) {
     status: initialData?.status || "Borrador"
   });
 
-  const [recursos, setRecursos] = useState(initialData?.recursos || {
-    personal: "N/A",
-    equipos: "N/A",
-    materiales: "N/A",
-    coordinacionC: "N/A",
-    bloqueo: "N/A",
-    permisoC: "N/A"
-  });
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [isQuestionsLoading, setIsQuestionsLoading] = useState(true);
 
-  const [riesgos, setRiesgos] = useState(initialData?.riesgos || {
-    aprisionamiento: "N/A",
-    atrapamiento: "N/A",
-    caidaMismo: "N/A",
-    caidaDistinto: "N/A",
-    energiaE: "N/A",
-    fluidosP: "N/A",
-    sustanciasT: "N/A",
-    temperaturas: "N/A",
-    estadoP: "N/A",
-    radiacion: "N/A",
-    golpeadoC: "N/A",
-    golpeadoO: "N/A",
-    atropellado: "N/A",
-    inmersion: "N/A",
-    sobreesfuerzo: "N/A",
-    cargasS: "N/A",
-    incendioE: "N/A",
-    otros: ""
-  });
-
-  const [medidas, setMedidas] = useState(initialData?.medidas || {
-    limpiesa: "N/A",
-    iluminacion: "N/A",
-    ventilacion: "N/A",
-    electricas: "N/A",
-    superficies: "N/A",
-    delimitada: "N/A",
-    controlL: "N/A",
-    enclavamiento: "N/A",
-    eppAdecuado: "N/A",
-    arnes: "N/A",
-    fueraCarga: "N/A",
-    izajes: "N/A",
-    evitarIncendio: "N/A",
-    zonaSeguridad: "N/A"
-  });
-
-  const [epp, setEpp] = useState(initialData?.epp || {
-    casco: false,
-    lentes: false,
-    calzado: false,
-    respiratorio: false,
-    careta: false,
-    guantes: false,
-    legionario: false,
-    barbiquejo: false,
-    auditivo: false,
-    soldar: false,
-    solar: false,
-    arnesY: false,
-    otros: ""
-  });
+  const [recursos, setRecursos] = useState(initialData?.recursos || {});
+  const [riesgos, setRiesgos] = useState(initialData?.riesgos || {});
+  const [medidas, setMedidas] = useState(initialData?.medidas || {});
+  const [epp, setEpp] = useState(initialData?.epp || {});
 
   const [workers, setWorkers] = useState<any[]>(initialData?.workers || []);
+
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      try {
+        const data = await getHPTQuestions();
+        setQuestions(data);
+        
+        // Populate initial values if new HPT
+        if (!initialData?.id) {
+          const initialRecursos: any = {};
+          const initialRiesgos: any = {};
+          const initialMedidas: any = {};
+          const initialEpp: any = {};
+
+          data.forEach((q: any) => {
+            if (q.category === 'recursos') initialRecursos[q.item_key] = 'N/A';
+            if (q.category === 'riesgos') initialRiesgos[q.item_key] = q.item_key === 'otros' ? '' : 'N/A';
+            if (q.category === 'medidas') initialMedidas[q.item_key] = 'N/A';
+            if (q.category === 'epp') initialEpp[q.item_key] = false;
+          });
+
+          setRecursos((prev: any) => Object.keys(prev).length === 0 ? initialRecursos : prev);
+          setRiesgos((prev: any) => Object.keys(prev).length === 0 ? initialRiesgos : prev);
+          setMedidas((prev: any) => Object.keys(prev).length === 0 ? initialMedidas : prev);
+          setEpp((prev: any) => Object.keys(prev).length === 0 ? initialEpp : prev);
+        }
+      } catch (e) {
+        console.error("Error loading HPT questions:", e);
+      } finally {
+        setIsQuestionsLoading(false);
+      }
+    };
+    fetchQuestions();
+  }, [initialData]);
+
+  const dynamicQuestions = useMemo(() => {
+    return {
+      recursos: questions.filter(q => q.category === 'recursos' && (q.active || initialData?.recursos?.[q.item_key])),
+      riesgos: questions.filter(q => q.category === 'riesgos' && (q.active || initialData?.riesgos?.[q.item_key])),
+      medidas: questions.filter(q => q.category === 'medidas' && (q.active || initialData?.medidas?.[q.item_key])),
+      epp: questions.filter(q => q.category === 'epp' && (q.active || initialData?.epp?.[q.item_key]))
+    };
+  }, [questions, initialData]);
   const [folio, setFolio] = useState<number | string>(initialData?.folio || 0);
   const [personnel, setPersonnel] = useState<any[]>([]);
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
@@ -135,6 +123,11 @@ export function HPTForm({ initialData }: { initialData?: any }) {
 
   const isAdmin = userProfile?.rol_t?.toLowerCase() === 'admin' || 
     userProfile?.rol_t?.toLowerCase() === 'administrador';
+  
+  const isPrevencionista = userProfile?.rol_t?.toLowerCase() === 'prevencionista' || 
+    userProfile?.rol_t?.toLowerCase() === 'prevenc';
+
+  const isCompletedEdit = initialData?.status === 'Completado';
 
   useEffect(() => {
     const fetchPersonnel = async () => {
@@ -314,8 +307,24 @@ export function HPTForm({ initialData }: { initialData?: any }) {
           </div>
         </CardHeader>
 
-        <CardContent className="p-8">
-          <form className="space-y-8" onSubmit={(e) => e.preventDefault()}>
+        <CardContent className="p-0 overflow-hidden">
+          {/* Status Indicator / Banner */}
+          {isCompletedEdit && (
+            <div className="bg-amber-500/10 border-b border-amber-500/20 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-600">
+                  <ShieldCheck className="h-6 w-6" />
+                </div>
+                <div>
+                  <h4 className="font-black uppercase text-[10px] tracking-widest text-amber-700 leading-none mb-1">Modo Edición Prevención</h4>
+                  <p className="text-[10px] font-bold text-amber-600/70 uppercase">Usted está modificando un documento ya finalizado.</p>
+                </div>
+              </div>
+              <Badge className="bg-amber-500 text-white font-black uppercase text-[8px] tracking-widest rounded-lg px-2 py-1">Revisión</Badge>
+            </div>
+          )}
+
+          <form className="p-8 space-y-8" onSubmit={(e) => e.preventDefault()}>
             
             {/* Step 0: General and Team */}
             {currentStep === 0 && (
@@ -477,25 +486,21 @@ export function HPTForm({ initialData }: { initialData?: any }) {
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest leading-relaxed">RECURSOS / COORDINACIÓN / PERMISOS:</p>
                 <div className="grid grid-cols-1 gap-4">
-                  {[
-                    { id: 'personal', label: '1. ¿Se cuenta con el personal necesario y entrenado según el procedimiento de trabajo ICSA?' },
-                    { id: 'equipos', label: '2. ¿Se cuenta con los Equipos, Herramientas necesarias, y estos se encuentran en buen estado de uso? (Aplico lista de Verificación.)' },
-                    { id: 'materiales', label: '3. ¿Se dispone de los materiales, repuestos e insumos necesarios?' },
-                    { id: 'coordinacionC', label: '4. ¿Se realizó coordinaciones necesarias con cliente para acceder a las zonas de trabajo?' },
-                    { id: 'bloqueo', label: '5. ¿Se coordinó bloqueo de seguridad y/o líneas (Eléctricas, Hidráulicas, etc.)?' },
-                    { id: 'permisoC', label: '6. ¿Se solicitó el permiso de ingreso al personal de prevención de riesgos cliente?' }
-                  ].map((item) => (
-                    <div key={item.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-muted/10 rounded-[2rem] gap-4">
-                      <Label className="text-xs font-bold leading-tight flex-1">{item.label}</Label>
+                  {dynamicQuestions.recursos.map((item: any, idx: number) => (
+                    <div key={item.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-muted/10 rounded-[2rem] gap-4 group hover:bg-muted/20 transition-all border border-transparent hover:border-black/5">
+                      <div className="flex gap-4 items-start flex-1 min-w-0">
+                        <span className="h-6 w-6 rounded-lg bg-primary/10 flex items-center justify-center font-black text-primary text-[10px] shrink-0">{idx + 1}</span>
+                        <Label className="text-xs font-bold leading-tight pt-1 truncate whitespace-normal">{item.label}</Label>
+                      </div>
                       <div className="flex bg-white/50 p-1 rounded-xl shadow-inner gap-1 shrink-0">
                         {['SI', 'NO', 'N/A'].map((opt) => (
                           <button
                             key={opt}
                             type="button"
-                            onClick={() => setRecursos((prev: any) => ({ ...prev, [item.id]: opt }))}
+                            onClick={() => setRecursos((prev: any) => ({ ...prev, [item.item_key]: opt }))}
                             className={`px-4 py-2 rounded-lg text-[10px] font-black transition-all ${
-                              recursos[item.id as keyof typeof recursos] === opt 
-                                ? 'bg-primary text-white shadow-md' 
+                              recursos[item.item_key] === opt 
+                                ? 'bg-primary text-white shadow-md scale-105' 
                                 : 'text-muted-foreground hover:bg-muted'
                             }`}
                           >
@@ -514,37 +519,22 @@ export function HPTForm({ initialData }: { initialData?: any }) {
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-y-auto max-h-[60vh] pr-2 custom-scrollbar">
                 <p className="text-xs font-black text-primary uppercase tracking-widest mb-4">IDENTIFICACIÓN DE ACCIDENTES POTENCIALES O RIESGOS ASOCIADOS:</p>
                 <div className="grid grid-cols-1 gap-3">
-                  {[
-                    { id: 'aprisionamiento', label: '1. Aprisionamiento. (Tableros, máquinas o equipos en movimiento...)' },
-                    { id: 'atrapamiento', label: '2. Atrapamiento. (De o parte de todo el cuerpo por objetos en mov...)' },
-                    { id: 'caidaMismo', label: '3. Caída al mismo nivel. (Al caminar en áreas con agua, hielo...)' },
-                    { id: 'caidaDistinto', label: '4. Caída a distinto nivel. (Caballetes, andamios, escaleras...)' },
-                    { id: 'energiaE', label: '5. Contacto con energía eléctrica. (Comando, tableros generales...)' },
-                    { id: 'fluidosP', label: '6. Contacto con fluidos a presión. (Agua, aire, gases, vapor, etc)' },
-                    { id: 'sustanciasT', label: '7. Contacto con sust. Tóxicas. (Cloro, flúor, ácido sulfúrico...)' },
-                    { id: 'temperaturas', label: '8. Contacto con Temperaturas Extremas. (Calor o Frío...)' },
-                    { id: 'estadoP', label: '9. Estado Personal. (Salud física/psicológica para ejecutar trabajo)' },
-                    { id: 'radiacion', label: '10. Exposición a. (Radiación UV, ruidos, gases, polvos, humos, etc)' },
-                    { id: 'golpeadoC', label: '11. Golpeado con o Contra Herr. (Objetos, estructuras, máquinas)' },
-                    { id: 'golpeadoO', label: '12. Golpeado por objetos en Mov. (Cualquier elemento en movimiento)' },
-                    { id: 'atropellado', label: '13. Atropellado Por Vehículo o Maq. (En movimiento)' },
-                    { id: 'inmersion', label: '14. Por Inmersión (asfixia). (Espacios cerrados, sust. tóxicas)' },
-                    { id: 'sobreesfuerzo', label: '15. Sobreesfuerzo. (Levantar carga sin ayuda o equipos)' },
-                    { id: 'cargasS', label: '16. Cargas Suspendidas. (Exposición bajo cargas)' },
-                    { id: 'incendioE', label: '17. Incendios, Explosión, Derrames.' }
-                  ].map((item) => (
-                    <div key={item.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-muted/10 rounded-2xl gap-3">
-                      <Label className="text-[11px] font-bold leading-tight flex-1">{item.label}</Label>
+                  {dynamicQuestions.riesgos.filter((q: any) => q.item_key !== 'otros').map((item: any, idx: number) => (
+                    <div key={item.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-muted/10 rounded-2xl gap-3 group hover:bg-muted/20 transition-all border border-transparent hover:border-black/5">
+                      <div className="flex gap-4 items-start flex-1 min-w-0">
+                        <span className="h-6 w-6 rounded-lg bg-primary/10 flex items-center justify-center font-black text-primary text-[10px] shrink-0">{idx + 1}</span>
+                        <Label className="text-[11px] font-bold leading-tight pt-1 truncate whitespace-normal">{item.label}</Label>
+                      </div>
                       <div className="flex bg-white/50 p-1 rounded-lg shadow-inner gap-1 shrink-0">
                         {['SI', 'NO', 'N/A'].map((opt) => (
                           <button
                             key={opt}
                             type="button"
-                            onClick={() => setRiesgos((prev: any) => ({ ...prev, [item.id]: opt }))}
+                            onClick={() => setRiesgos((prev: any) => ({ ...prev, [item.item_key]: opt }))}
                             className={`px-3 py-1.5 rounded-md text-[9px] font-black transition-all ${
-                              riesgos[item.id as keyof typeof riesgos] === opt 
-                                ? 'bg-primary text-white' 
-                                : 'text-muted-foreground'
+                              riesgos[item.item_key] === opt 
+                                ? 'bg-primary text-white shadow-md' 
+                                : 'text-muted-foreground hover:bg-muted'
                             }`}
                           >
                             {opt}
@@ -553,10 +543,19 @@ export function HPTForm({ initialData }: { initialData?: any }) {
                       </div>
                     </div>
                   ))}
-                  <div className="space-y-2 pt-4">
-                    <Label className="font-black uppercase text-[10px] text-muted-foreground">18. Otros:</Label>
-                    <Input placeholder="Especifique otros riesgos..." value={riesgos.otros} onChange={(e) => setRiesgos((prev: any) => ({ ...prev, otros: e.target.value }))} className="h-12 bg-muted/30 border-none rounded-2xl font-bold px-6" />
-                  </div>
+                  
+                  {/* Otros riesgos (always at end if exists) */}
+                  {questions.find(q => q.category === 'riesgos' && q.item_key === 'otros') && (
+                    <div className="space-y-2 pt-4 border-t border-black/5">
+                      <Label className="font-black uppercase text-[10px] text-muted-foreground ml-1">Otros Riesgos:</Label>
+                      <Input 
+                        placeholder="Especifique otros riesgos..." 
+                        value={riesgos.otros || ""} 
+                        onChange={(e) => setRiesgos((prev: any) => ({ ...prev, otros: e.target.value }))} 
+                        className="h-12 bg-muted/30 border-none rounded-2xl font-bold px-6 shadow-inner" 
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -566,34 +565,22 @@ export function HPTForm({ initialData }: { initialData?: any }) {
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-y-auto max-h-[60vh] pr-2 custom-scrollbar">
                 <p className="text-xs font-black text-primary uppercase tracking-widest mb-4">IDENTIFICACIÓN DE LAS MEDIDAS DE SEGURIDAD:</p>
                 <div className="grid grid-cols-1 gap-3">
-                  {[
-                    { id: 'limpiesa', label: '1. El área de trabajo está limpia, ordenada y con accesos expeditos.' },
-                    { id: 'iluminacion', label: '2. El área dispone de la iluminación requerida para la tarea.' },
-                    { id: 'ventilacion', label: '3. El área dispone de la ventilación requerida para la tarea.' },
-                    { id: 'electricas', label: '4. Las instalaciones eléc. portátiles se encuentran en buen estado.' },
-                    { id: 'superficies', label: '5. Las superficies de trabajo se encuentran en buenas condiciones.' },
-                    { id: 'delimitada', label: '6. Está delimitada la zona de bloqueo / movimientos de equipos.' },
-                    { id: 'controlL', label: '7. Se verifica el control local de los bloqueos del o los equipos.' },
-                    { id: 'enclavamiento', label: '8. Se verifica enclavamiento mecánico de andamios/escalas.' },
-                    { id: 'eppAdecuado', label: '9. Se verifica la utilización de los EPP adecuados y en buen estado.' },
-                    { id: 'arnes', label: '10. Se utilizan arnés de seguridad sobre 1,5 mt.' },
-                    { id: 'fueraCarga', label: '11. Los trabajadores se ubican fuera del área de carga suspendida.' },
-                    { id: 'izajes', label: '12. Se utilizan equipos de izajes y traslado de materiales en buen estado.' },
-                    { id: 'evitarIncendio', label: '13. Se implementan medidas para evitar un incendio en el área.' },
-                    { id: 'zonaSeguridad', label: '14. El área cuenta con zona de seguridad en caso de emergencias.' }
-                  ].map((item) => (
-                    <div key={item.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-muted/10 rounded-2xl gap-3">
-                      <Label className="text-[11px] font-bold leading-tight flex-1">{item.label}</Label>
+                  {dynamicQuestions.medidas.map((item: any, idx: number) => (
+                    <div key={item.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-muted/10 rounded-2xl gap-3 group hover:bg-muted/20 transition-all border border-transparent hover:border-black/5">
+                      <div className="flex gap-4 items-start flex-1 min-w-0">
+                        <span className="h-6 w-6 rounded-lg bg-primary/10 flex items-center justify-center font-black text-primary text-[10px] shrink-0">{idx + 1}</span>
+                        <Label className="text-[11px] font-bold leading-tight pt-1 truncate whitespace-normal">{item.label}</Label>
+                      </div>
                       <div className="flex bg-white/50 p-1 rounded-lg shadow-inner gap-1 shrink-0">
                         {['SI', 'NO', 'N/A'].map((opt) => (
                           <button
                             key={opt}
                             type="button"
-                            onClick={() => setMedidas((prev: any) => ({ ...prev, [item.id]: opt }))}
+                            onClick={() => setMedidas((prev: any) => ({ ...prev, [item.item_key]: opt }))}
                             className={`px-3 py-1.5 rounded-md text-[9px] font-black transition-all ${
-                              medidas[item.id as keyof typeof medidas] === opt 
-                                ? 'bg-primary text-white' 
-                                : 'text-muted-foreground'
+                              medidas[item.item_key] === opt 
+                                ? 'bg-primary text-white shadow-md' 
+                                : 'text-muted-foreground hover:bg-muted'
                             }`}
                           >
                             {opt}
@@ -609,36 +596,29 @@ export function HPTForm({ initialData }: { initialData?: any }) {
             {/* Step 5: EPP */}
             {currentStep === 5 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <p className="text-xs font-black text-primary uppercase tracking-widest">EQUIPOS DE PROTECCIÓN Y ELEMENTOS DE SEGURIDAD REQUERIDOS:</p>
+                <p className="text-xs font-black text-primary uppercase tracking-widest leading-relaxed">EQUIPOS DE PROTECCIÓN Y SEGURIDAD REQUERIDOS:</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {[
-                    { id: 'casco', label: 'Casco de Seguridad' },
-                    { id: 'lentes', label: 'Lentes de Seguridad' },
-                    { id: 'calzado', label: 'Calzado de Seguridad' },
-                    { id: 'respiratorio', label: 'Protector Respiratorio' },
-                    { id: 'careta', label: 'Careta Facial' },
-                    { id: 'guantes', label: 'Guantes de seguridad' },
-                    { id: 'legionario', label: 'Legionario' },
-                    { id: 'barbiquejo', label: 'Barbiquejo' },
-                    { id: 'auditivo', label: 'Protector Auditivo' },
-                    { id: 'soldar', label: 'Máscara soldar' },
-                    { id: 'solar', label: 'Protector solar' },
-                    { id: 'arnesY', label: 'Arnés de Seguridad y Cabo de Vida tipo Y' }
-                  ].map((item) => (
-                    <div key={item.id} className="flex items-center space-x-3 p-3 bg-muted/10 rounded-xl hover:bg-muted/20 transition-colors">
+                  {dynamicQuestions.epp.filter((q: any) => q.item_key !== 'otros').map((item: any) => (
+                    <div key={item.id} className="flex items-center space-x-3 p-3 bg-muted/10 rounded-xl hover:bg-muted/20 transition-all border border-transparent hover:border-black/5">
                       <Checkbox 
                         id={item.id} 
-                        checked={!!epp[item.id as keyof typeof epp]} 
-                        onCheckedChange={(val) => setEpp((prev: any) => ({ ...prev, [item.id]: !!val }))} 
+                        checked={!!epp[item.item_key]} 
+                        onCheckedChange={(val) => setEpp((prev: any) => ({ ...prev, [item.item_key]: !!val }))} 
                         className="h-5 w-5 rounded border-primary/20 data-[state=checked]:bg-primary" 
                       />
-                      <Label htmlFor={item.id} className="text-[10px] font-black uppercase tracking-tight cursor-pointer flex-1 py-1">{item.label}</Label>
+                      <Label htmlFor={item.id} className="text-[10px] font-black uppercase tracking-tight cursor-pointer flex-1 py-1 leading-tight">{item.label}</Label>
                     </div>
                   ))}
                 </div>
+                {/* Otros EPP (always at end if exists or just standard) */}
                 <div className="space-y-2 pt-4 border-t border-black/5">
-                  <Label className="font-black uppercase text-[10px] text-muted-foreground ml-1">Otros EPP:</Label>
-                  <Input placeholder="Especifique..." value={epp.otros} onChange={(e) => setEpp((prev: any) => ({ ...prev, otros: e.target.value }))} className="h-14 bg-muted/30 border-none rounded-2xl font-bold px-6 shadow-inner" />
+                  <Label className="font-black uppercase text-[10px] text-muted-foreground ml-1">Otros EPP / Observaciones:</Label>
+                  <Input 
+                    placeholder="Especifique..." 
+                    value={epp.otros || ""} 
+                    onChange={(e) => setEpp((prev: any) => ({ ...prev, otros: e.target.value }))} 
+                    className="h-14 bg-muted/30 border-none rounded-2xl font-bold px-6 shadow-inner" 
+                  />
                 </div>
               </div>
             )}
@@ -689,18 +669,18 @@ export function HPTForm({ initialData }: { initialData?: any }) {
             )}
 
             {/* Navigation Buttons */}
-            {currentStep < 6 && (
-              <div className="flex gap-4 pt-8 border-t border-black/5">
-                {currentStep > 0 && (
-                  <Button type="button" variant="outline" onClick={handleBack} className="h-16 flex-1 rounded-2xl border-none bg-muted/50 font-black uppercase text-xs tracking-widest hover:bg-muted group">
-                    <ArrowLeft className="mr-2 h-5 w-5 group-hover:-translate-x-1 transition-transform" /> Atrás
-                  </Button>
-                )}
+            <div className="flex gap-4 pt-8 border-t border-black/5">
+              {currentStep > 0 && (
+                <Button type="button" variant="outline" onClick={handleBack} className="h-16 flex-1 rounded-2xl border-none bg-muted/50 font-black uppercase text-xs tracking-widest hover:bg-muted group">
+                  <ArrowLeft className="mr-2 h-5 w-5 group-hover:-translate-x-1 transition-transform" /> Atrás
+                </Button>
+              )}
+              {currentStep < 6 && (
                 <Button type="button" onClick={handleNext} className="h-16 flex-[1.5] rounded-2xl bg-primary text-white font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/30 group">
                   Siguiente <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
 
           </form>
         </CardContent>

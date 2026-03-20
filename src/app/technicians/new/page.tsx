@@ -150,6 +150,7 @@ export default function NewTechnician() {
                       <SelectContent>
                         <SelectItem value="admin">Administrador</SelectItem>
                         <SelectItem value="supervisor">Supervisor</SelectItem>
+                        <SelectItem value="prevencionista">Prevencionista</SelectItem>
                         <SelectItem value="tecnico">Técnico</SelectItem>
                       </SelectContent>
                     </Select>

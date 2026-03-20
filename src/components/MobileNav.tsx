@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
     LayoutDashboard, Briefcase, ClipboardList, Plus,
     MoreHorizontal, History, BookOpen, Users, UserRound,
-    LogOut, ChevronRight, X, Wrench
+    LogOut, ChevronRight, X, Wrench, Settings
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -23,6 +23,8 @@ export function MobileNav() {
 
     const isAdmin = userProfile?.rol_t?.toLowerCase() === 'admin' || 
         userProfile?.rol_t?.toLowerCase() === 'administrador';
+    const isPrevencionista = userProfile?.rol_t?.toLowerCase() === 'prevencionista' || 
+        userProfile?.rol_t?.toLowerCase() === 'prevenc';
     const activeTab = searchParams.get("tab") || "dashboard";
 
     const navItems = [
@@ -43,8 +45,10 @@ export function MobileNav() {
         { label: "Actas Herramientas", icon: History, href: "/dashboard?tab=tool-history", active: activeTab === "tool-history" && pathname === "/dashboard" },
         { label: "HPT (Seguridad)", icon: ClipboardList, href: "/hpt", active: pathname === "/hpt" || pathname === "/hpt/new" },
         { label: "Charlas", icon: BookOpen, href: "/capacitaciones", active: pathname === "/capacitaciones" || pathname === "/capacitaciones/new" },
+        { label: "Configuración HPT", icon: Settings, href: "/hpt/settings", active: pathname === "/hpt/settings", roleRestricted: true },
     ].filter(item => {
         if (item.href === "/dashboard?tab=tool-history" && !isAdmin) return false;
+        if (item.roleRestricted && !(isAdmin || isPrevencionista)) return false;
         return true;
     });
 

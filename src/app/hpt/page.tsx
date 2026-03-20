@@ -5,11 +5,11 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, FileText, Calendar, User, Search, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, FileText, Calendar, User, Search, Loader2, Settings } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser, useUserProfile } from "@/lib/auth-provider";
-import { getHPTs, getHPTById } from "@/actions/db-actions";
+import { getHPTs, getHPTById, getHPTQuestions } from "@/actions/db-actions";
 import { useActionData } from "@/hooks/use-action-data";
 import { generateHPTPDF } from "@/lib/pdf-generator";
 
@@ -37,11 +37,21 @@ export default function HPTListPage() {
     hpt.folio?.toString().includes(searchTerm)
   );
 
+  const isPrevencionista = userProfile?.rol_t?.toLowerCase() === 'prevencionista' || 
+    userProfile?.rol_t?.toLowerCase() === 'prevenc';
+
+  const canEditHPT = (hpt: any) => {
+    if (isAdmin || isPrevencionista) return true;
+    if (hpt.status === 'Borrador' && hpt.supervisorId === user?.uid) return true;
+    return false;
+  };
+
   const handleDownloadPDF = async (id: string) => {
     try {
       const fullData = await getHPTById(id);
+      const questions = await getHPTQuestions();
       if (fullData) {
-        await generateHPTPDF(fullData);
+        await generateHPTPDF(fullData, questions);
       }
     } catch (e) {
       console.error("Error generating HPT PDF:", e);
@@ -64,11 +74,20 @@ export default function HPTListPage() {
             </Link>
             <h1 className="font-black text-lg uppercase tracking-tighter leading-tight">HPT - Planificación</h1>
           </div>
-          <Link href="/hpt/new">
-            <Button className="bg-white text-primary hover:bg-white/90 font-black rounded-xl text-xs uppercase tracking-widest shadow-lg">
-              <Plus className="h-4 w-4 mr-1" /> Nuevo
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            {(isAdmin || isPrevencionista) && (
+              <Link href="/hpt/settings">
+                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-white/10 text-white" title="Configuración de HPT">
+                  <Settings className="h-5 w-5" />
+                </Button>
+              </Link>
+            )}
+            <Link href="/hpt/new">
+              <Button className="bg-white text-primary hover:bg-white/90 font-black rounded-xl text-xs uppercase tracking-widest shadow-lg">
+                <Plus className="h-4 w-4 mr-1" /> Nuevo
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -126,9 +145,11 @@ export default function HPTListPage() {
                     </div>
                   </div>
                   <div className="bg-muted/30 p-3 flex gap-2">
-                    <Link href={`/hpt/${hpt.id}/edit`} className="flex-1">
-                      <Button variant="ghost" className="w-full h-10 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-white">Editar</Button>
-                    </Link>
+                    {canEditHPT(hpt) && (
+                      <Link href={`/hpt/${hpt.id}/edit`} className="flex-1">
+                        <Button variant="ghost" className="w-full h-10 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-white text-primary">Editar</Button>
+                      </Link>
+                    )}
                     <Button 
                       onClick={() => handleDownloadPDF(hpt.id)}
                       className="flex-1 h-10 rounded-xl bg-primary text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20"

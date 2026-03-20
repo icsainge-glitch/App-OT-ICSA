@@ -480,18 +480,18 @@ export function CapacitacionForm({ initialData }: { initialData?: any }) {
             )}
 
             {/* Navigation Buttons */}
-            {currentStep < 3 && (
-              <div className="flex gap-4 pt-8 border-t border-black/5">
-                {currentStep > 0 && (
-                  <Button type="button" variant="outline" onClick={handleBack} className="h-16 flex-1 rounded-2xl border-none bg-muted/50 font-black uppercase text-xs tracking-widest hover:bg-muted group">
-                    <ArrowLeft className="mr-2 h-5 w-5 group-hover:-translate-x-1 transition-transform" /> Atrás
-                  </Button>
-                )}
+            <div className="flex gap-4 pt-8 border-t border-black/5">
+              {currentStep > 0 && (
+                <Button type="button" variant="outline" onClick={handleBack} className="h-16 flex-1 rounded-2xl border-none bg-muted/50 font-black uppercase text-xs tracking-widest hover:bg-muted group">
+                  <ArrowLeft className="mr-2 h-5 w-5 group-hover:-translate-x-1 transition-transform" /> Atrás
+                </Button>
+              )}
+              {currentStep < 3 && (
                 <Button type="button" onClick={handleNext} className="h-16 flex-[1.5] rounded-2xl bg-primary text-white font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/30 group">
                   Siguiente <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
 
           </form>
         </CardContent>

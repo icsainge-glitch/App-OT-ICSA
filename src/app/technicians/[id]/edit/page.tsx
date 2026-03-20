@@ -61,6 +61,7 @@ export default function EditTechnician({ params }: { params: Promise<{ id: strin
       let normalizedRole = "tecnico";
       if (rawRole.toLowerCase().includes("admin")) normalizedRole = "admin";
       else if (rawRole.toLowerCase().includes("supervisor")) normalizedRole = "supervisor";
+      else if (rawRole.toLowerCase().includes("prevenc") || rawRole.toLowerCase().includes("prevencionista")) normalizedRole = "prevencionista";
       else if (rawRole.toLowerCase().includes("tecnico") || rawRole.toLowerCase().includes("técnico")) normalizedRole = "tecnico";
 
       setFormData({
@@ -307,6 +308,7 @@ export default function EditTechnician({ params }: { params: Promise<{ id: strin
                       <SelectContent className="border-none shadow-2xl rounded-2xl">
                         <SelectItem value="admin" className="font-bold uppercase text-[10px] py-3">Administrador ICSA</SelectItem>
                         <SelectItem value="supervisor" className="font-bold uppercase text-[10px] py-3">Supervisor de Terreno</SelectItem>
+                        <SelectItem value="prevencionista" className="font-bold uppercase text-[10px] py-3">Prevencionista (Seguridad)</SelectItem>
                         <SelectItem value="tecnico" className="font-bold uppercase text-[10px] py-3">Técnico Instalador</SelectItem>
                       </SelectContent>
                     </Select>

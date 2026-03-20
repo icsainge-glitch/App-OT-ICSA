@@ -157,7 +157,7 @@ export async function getActiveProjects(userId?: string, isAdmin?: boolean, incl
         // Robust filtering: attempt DB-level filtering but ensure fallback is solid
         // Since teamIds might be stored as TEXT instead of JSONB array in Turso/SQLite
         // we use a more general approach or the manual filter fallback.
-        query = query.contains('teamIds', [userId]);
+        query = query.contains('teamids', [userId]);
     }
 
     let data, error;
@@ -200,7 +200,7 @@ export async function getActiveProjects(userId?: string, isAdmin?: boolean, incl
             const { data: allProj } = await supabase.from('projects').select('*').limit(50);
             console.log(`[DIAGNOSTIC] Total projects in DB (50 limit): ${allProj?.length || 0}`);
             const manualMatches = (allProj || []).filter((p: any) => {
-                const tIds = Array.isArray(p.teamIds) ? p.teamIds : [];
+                const tIds = Array.isArray(p.teamids) ? p.teamids : [];
                 return tIds.includes(userId);
             });
             console.log(`[DIAGNOSTIC] Manual check found ${manualMatches.length} matches.`);
@@ -217,7 +217,7 @@ export async function getActiveProjects(userId?: string, isAdmin?: boolean, incl
         // 1. Filter by teamIds (Only see what I created or where I am a collaborator)
         const beforeTeamFilter = projects.length;
         projects = projects.filter((p: any) => {
-            const tIds = Array.isArray(p.teamIds) ? p.teamIds : [];
+            const tIds = Array.isArray(p.teamids) ? p.teamids : [];
             return tIds.includes(userId);
         });
         if (beforeTeamFilter !== projects.length) {
@@ -227,7 +227,7 @@ export async function getActiveProjects(userId?: string, isAdmin?: boolean, incl
         // 2. Filter out hidden projects for current user
         const beforeHiddenFilter = projects.length;
         projects = projects.filter((p: any) => {
-            const hiddenBy = Array.isArray(p.hiddenBy) ? p.hiddenBy : [];
+            const hiddenBy = Array.isArray(p.hiddenby) ? p.hiddenby : [];
             return !hiddenBy.includes(userId);
         });
         if (beforeHiddenFilter !== projects.length) {
@@ -1559,5 +1559,40 @@ export async function submitCapacitacionRemoteSignature(input: {
         console.error("Error submitting remote signature for capacitacion:", e);
         return { success: false, error: e.message };
     }
+}
+
+// --- HPT CONFIGURATION ACTIONS ---
+
+export async function getHPTQuestions() {
+    noStore();
+    const { data, error } = await supabase
+        .from('hpt_questions')
+        .select('*')
+        .order('category', { ascending: true })
+        .order('order_index', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+}
+
+export async function updateHPTQuestion(id: string, updates: any) {
+    const { error } = await supabase
+        .from('hpt_questions')
+        .update(updates)
+        .eq('id', id);
+    
+    if (error) throw error;
+    revalidatePath('/hpt/settings');
+    return { success: true };
+}
+
+export async function addHPTQuestion(question: any) {
+    const { error } = await supabase
+        .from('hpt_questions')
+        .insert([question]);
+    
+    if (error) throw error;
+    revalidatePath('/hpt/settings');
+    return { success: true };
 }
 

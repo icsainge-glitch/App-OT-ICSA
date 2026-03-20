@@ -10,26 +10,22 @@ export function useActionData<T>(
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
-    useEffect(() => {
-        let mounted = true;
+    const fetchData = async () => {
         setIsLoading(true);
-        actionFn()
-            .then(res => {
-                if (mounted) {
-                    setData(res);
-                    setIsLoading(false);
-                }
-            })
-            .catch(err => {
-                if (mounted) {
-                    setError(err);
-                    setIsLoading(false);
-                }
-            });
+        try {
+            const res = await actionFn();
+            setData(res);
+        } catch (err: any) {
+            setError(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-        return () => { mounted = false; };
+    useEffect(() => {
+        fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, deps);
 
-    return { data, isLoading, error };
+    return { data, isLoading, error, refetch: fetchData };
 }

@@ -41,25 +41,24 @@ export default function Home() {
 
       <main className="flex-1">
         <section className="relative h-[calc(100vh-96px)] min-h-[500px] flex items-start justify-center pt-40 md:pt-48 overflow-hidden">
-          <div className="absolute inset-0 z-0 bg-slate-950">
+          <div className="absolute inset-0 z-0">
             <Image
               src="/hero-bg.png"
-              alt="ICSA Network Background"
+              alt="ICSA City Network Background"
               fill
-              className="object-cover opacity-70 scale-105 animate-pulse-slow italic"
+              className="object-cover opacity-25"
               priority
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-            <div className="absolute inset-0 bg-primary/10 mix-blend-overlay" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
           </div>
           <div className="container mx-auto px-4 relative z-10 text-center">
             <div className="max-w-4xl mx-auto space-y-12">
-              <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-white leading-[0.85] drop-shadow-2xl">
+              <h1 className="text-6xl md:text-7xl font-black tracking-tighter text-primary leading-[0.85]">
                 Ordenes de Trabajo <br />
-                <span className="text-accent drop-shadow-[0_0_15px_rgba(var(--accent),0.5)]">Digital</span>
+                <span className="text-accent">Digital</span>
               </h1>
-              <p className="text-base md:text-xl text-white/80 font-medium max-w-2xl mx-auto leading-relaxed px-4 drop-shadow-md">
-                Plataforma de gestión operativa de alto rendimiento para ICSA. Digitaliza tus formularios, captura firmas y optimiza el flujo técnico.
+              <p className="text-base md:text-xl text-muted-foreground font-medium max-w-2xl mx-auto leading-relaxed px-4">
+                Plataforma de gestión operativa para ICSA. Digitaliza tus formularios, captura firmas y optimiza el flujo técnico.
               </p>
             </div>
           </div>

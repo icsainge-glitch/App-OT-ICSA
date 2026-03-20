@@ -63,7 +63,7 @@ export function CapacitacionForm({ initialData }: { initialData?: any }) {
     firmaSupervisor: initialData?.firmaSupervisor || "",
     status: initialData?.status || "Pendiente",
     prevencionEmail: initialData?.prevencionEmail || "icsaprevencion@gmail.com",
-    prevencionName: initialData?.prevencionName || "Departamento de Prevención"
+    prevencionName: initialData?.prevencionName || "José Mellado"
   });
 
   const [assistants, setAssistants] = useState<any[]>(initialData?.assistants || []);

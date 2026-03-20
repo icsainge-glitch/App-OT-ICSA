@@ -3,6 +3,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { sendWorkOrderEmail } from '@/ai/flows/send-work-order-email-flow';
+import { sendHPTEmail } from '@/ai/flows/send-hpt-email-flow';
 import { sendProjectInvitationEmail } from '@/ai/flows/send-project-invitation-email-flow';
 import { revalidatePath, unstable_noStore as noStore } from 'next/cache';
 import crypto from 'crypto';
@@ -33,7 +34,7 @@ const KEY_MAPPING: { [key: string]: string } = {
     'supervisorname': 'supervisorName',
     'supervisorrut': 'supervisorRut',
     'trabajorealizar': 'trabajoRealizar',
-    'medidasseguridad': 'medidasSeguridad',
+    'medidasseguridad': 'medidas',
     'firmasupervisor': 'firmaSupervisor',
     'horainicio': 'horaInicio',
     'horatermino': 'horaTermino',
@@ -56,17 +57,30 @@ const KEY_MAPPING: { [key: string]: string } = {
     'techsignatureurl': 'techSignatureUrl',
     'clientsignatureurl': 'clientSignatureUrl',
     'signaturedate': 'signatureDate',
-    'sketchimageurl': 'sketchImageUrl'
+    'sketchimageurl': 'sketchImageUrl',
+    'signature_token': 'signatureToken',
+    'token_expiry': 'tokenExpiry',
+    'prevencion_signature_url': 'prevencionSignatureUrl',
+    'prevencion_signature_date': 'prevencionSignatureDate'
 };
 
+// Reverse mapping for toDbPayload
+const REVERSE_KEY_MAPPING: { [key: string]: string } = {};
+Object.entries(KEY_MAPPING).forEach(([db, fe]) => {
+    REVERSE_KEY_MAPPING[fe] = db;
+});
+
 /**
- * Standardizes a payload for Supabase by lowercasing all top-level keys.
+ * Standardizes a payload for Supabase by mapping frontend camelCase keys
+ * back to their respective database column names.
  */
 function toDbPayload(data: any) {
     if (!data || typeof data !== 'object') return data;
     const payload: any = {};
-    Object.keys(data).forEach(key => {
-        payload[key.toLowerCase()] = data[key];
+    Object.keys(data).forEach(feKey => {
+        // Try mapping first, fallback to lowercase
+        const dbKey = REVERSE_KEY_MAPPING[feKey] || feKey.toLowerCase();
+        payload[dbKey] = data[feKey];
     });
     return payload;
 }
@@ -1358,8 +1372,9 @@ export async function getNextFolioHPT() {
 export async function saveHPT(hptData: any, workers: any[]) {
     try {
         const hptId = hptData.id || crypto.randomUUID();
+        const { workers: _, ...cleanHptData } = hptData; // Exclude workers array
         const payload = toDbPayload({
-            ...hptData,
+            ...cleanHptData,
             id: hptId,
             updatedAt: new Date().toISOString()
         });
@@ -1479,8 +1494,9 @@ export async function getNextFolioCapacitacion() {
 export async function saveCapacitacion(capData: any, assistants: any[]) {
     try {
         const capId = capData.id || crypto.randomUUID();
+        const { assistants: _, ...cleanCapData } = capData; // Exclude assistants array
         const payload = toDbPayload({
-            ...capData,
+            ...cleanCapData,
             id: capId,
             updatedAt: new Date().toISOString()
         });
@@ -1619,6 +1635,49 @@ export async function submitCapacitacionRemoteSignature(input: {
         return { success: true };
     } catch (e: any) {
         console.error("Error submitting remote signature for capacitacion:", e);
+        return { success: false, error: e.message };
+    }
+}
+
+export async function submitHPTRemoteSignature(input: {
+    id: string;
+    token: string;
+    prevencionName: string;
+    prevencionSignatureUrl: string;
+}) {
+    try {
+        const hpt = await getHPTById(input.id);
+        if (!hpt) return { success: false, error: 'La HPT no existe.' };
+
+        if (hpt.signatureToken !== input.token) return { success: false, error: 'Token no válido.' };
+
+        if (hpt.tokenExpiry && new Date(hpt.tokenExpiry) < new Date()) {
+            return { success: false, error: 'Enlace expirado.' };
+        }
+
+        const updatedData = {
+            ...hpt,
+            prevencionSignatureUrl: input.prevencionSignatureUrl,
+            prevencionSignatureDate: new Date().toISOString(),
+            status: 'Completado',
+            updatedAt: new Date().toISOString()
+        };
+
+        const { workers, ...hptWithoutWorkers } = updatedData;
+        const payload = toDbPayload(hptWithoutWorkers);
+
+        const { error } = await supabase.from('hpt').upsert(payload);
+        if (error) throw error;
+
+        // Trigger email sending flow
+        sendHPTEmail({ hptId: input.id }).catch(e => console.error("Error triggering HPT email flow:", e));
+
+        revalidatePath('/hpt');
+        revalidatePath(`/hpt/${input.id}`);
+
+        return { success: true };
+    } catch (e: any) {
+        console.error("Error submitting remote signature for HPT:", e);
         return { success: false, error: e.message };
     }
 }

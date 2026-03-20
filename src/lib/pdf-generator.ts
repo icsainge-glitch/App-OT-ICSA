@@ -712,12 +712,47 @@ export const generateBatchReturnActPDF = async (movements: any[]) => {
 // --- HPT PDF GENERATOR ---
 export const generateHPTPDF = async (data: any, questions: any[] = []) => {
   const doc = new jsPDF();
+  let logoBase64 = "";
+  try { logoBase64 = await toDataURL(LOGO_URL); } catch (e) { }
+
+  await buildHPTPDF(doc, data, questions, logoBase64);
+
+  if (typeof window !== 'undefined') {
+    doc.save(`HPT-${data.folio || '000'}-${new Date(data.fecha || Date.now()).toISOString().split('T')[0]}.pdf`);
+  }
+  return doc;
+};
+
+// Server-side HPT PDF generation (returns Buffer)
+export const generateServerHPTPDF = async (data: any, questions: any[] = []): Promise<Buffer> => {
+  const doc = new jsPDF();
+  let logoBase64 = "";
+
+  try {
+    if (typeof window === 'undefined') {
+      const fs = eval('require("fs")');
+      const path = eval('require("path")');
+      const logoPath = path.join(process.cwd(), 'public', 'icsa-logo.png');
+      
+      if (fs.existsSync(logoPath)) {
+        const buffer = fs.readFileSync(logoPath);
+        logoBase64 = `data:image/png;base64,${buffer.toString('base64')}`;
+      }
+    }
+  } catch (e) {
+    console.error("Error loading logo for server HPT PDF:", e);
+  }
+
+  await buildHPTPDF(doc, data, questions, logoBase64);
+  const pdfArrayBuffer = doc.output('arraybuffer');
+  return Buffer.from(pdfArrayBuffer);
+};
+
+// Internal function to build the HPT PDF content
+const buildHPTPDF = async (doc: jsPDF, data: any, questions: any[] = [], logoBase64?: string) => {
   const margin = 10;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  let logoBase64 = "";
-
-  try { logoBase64 = await toDataURL(LOGO_URL); } catch (e) { }
 
   // Group questions by category for lookup
   const qMap: Record<string, any[]> = { recursos: [], riesgos: [], medidas: [], epp: [] };
@@ -728,7 +763,9 @@ export const generateHPTPDF = async (data: any, questions: any[] = []) => {
   }
 
   const drawHeader = (page: number) => {
-    if (logoBase64) doc.addImage(logoBase64, "PNG", margin, 10, 40, 15);
+    if (logoBase64) {
+        try { doc.addImage(logoBase64, "PNG", margin, 10, 40, 15); } catch(e){}
+    }
     doc.setDrawColor(0);
     doc.setLineWidth(0.1);
     doc.rect(margin, 10, pageWidth - margin * 2, 15);
@@ -786,9 +823,10 @@ export const generateHPTPDF = async (data: any, questions: any[] = []) => {
     theme: 'grid'
   });
   
+  const workers = data.workers || [];
   const workerRows = [];
   for(let i=0; i<10; i++) {
-    const w = data.workers?.[i];
+    const w = workers[i];
     workerRows.push([
       `Nombre Trabajador: ${w?.nombre || ''}`,
       `RUT: ${w?.rut || ''}`,
@@ -805,7 +843,7 @@ export const generateHPTPDF = async (data: any, questions: any[] = []) => {
     columnStyles: { 0: { cellWidth: 50 }, 1: { cellWidth: 40 }, 2: { cellWidth: 40 }, 3: { cellWidth: 60 } },
     didDrawCell: (cellData) => {
       if (cellData.section === 'body' && cellData.column.index === 3) {
-        const w = data.workers?.[cellData.row.index];
+        const w = workers[cellData.row.index];
         if (w?.firma) {
           try { doc.addImage(w.firma, 'PNG', cellData.cell.x + 10, cellData.cell.y + 1, 40, 6); } catch(e){}
         }
@@ -824,7 +862,6 @@ export const generateHPTPDF = async (data: any, questions: any[] = []) => {
   doc.text("RECURSOS / COORDINACIÓN / PERMISOS - (SI es NO, Corregir antes de iniciar)", margin + 2, currentY + 4);
   currentY += 6;
 
-  // Filter items: active OR already in data
   const resItems = qMap.recursos.length > 0 
     ? qMap.recursos.filter(q => q.active || data.recursos?.[q.item_key])
     : [
@@ -841,13 +878,13 @@ export const generateHPTPDF = async (data: any, questions: any[] = []) => {
   for(let i=0; i < resHalf; i++) {
     const left = resItems[i];
     const right = resItems[i + resHalf];
-    const getSNN = (obj: any, key: string) => {
-      const val = obj?.[key];
-      return [val === 'SI' ? 'X' : '', val === 'NO' ? 'X' : '', val === 'N/A' ? 'X' : ''];
-    };
+    const SNNSi = (obj: any, key: string) => obj?.[key] === 'SI' ? 'X' : '';
+    const SNNNo = (obj: any, key: string) => obj?.[key] === 'NO' ? 'X' : '';
+    const SNNNa = (obj: any, key: string) => obj?.[key] === 'N/A' ? 'X' : '';
+
     resRows.push([
-      (i+1).toString(), left.label, ...getSNN(data.recursos, left.item_key),
-      right ? (i + resHalf + 1).toString() : '', right ? right.label : '', ...(right ? getSNN(data.recursos, right.item_key) : ['', '', ''])
+      (i+1).toString(), left.label, SNNSi(data.recursos, left.item_key), SNNNo(data.recursos, left.item_key), SNNNa(data.recursos, left.item_key),
+      right ? (i + resHalf + 1).toString() : '', right ? right.label : '', right ? SNNSi(data.recursos, right.item_key) : '', right ? SNNNo(data.recursos, right.item_key) : '', right ? SNNNa(data.recursos, right.item_key) : ''
     ]);
   }
 
@@ -911,13 +948,13 @@ export const generateHPTPDF = async (data: any, questions: any[] = []) => {
   for(let i=0; i < riskHalf; i++) {
     const left = riskItems[i];
     const right = riskItems[i + riskHalf];
-    const getSNN = (obj: any, key: string) => {
-      const val = obj?.[key];
-      return [val === 'SI' ? 'X' : '', val === 'NO' ? 'X' : '', val === 'N/A' ? 'X' : ''];
-    };
+    const SNNSi = (obj: any, key: string) => obj?.[key] === 'SI' ? 'X' : '';
+    const SNNNo = (obj: any, key: string) => obj?.[key] === 'NO' ? 'X' : '';
+    const SNNNa = (obj: any, key: string) => obj?.[key] === 'N/A' ? 'X' : '';
+
     riskRows.push([
-      (i+1).toString(), left.label, ...getSNN(data.riesgos, left.item_key),
-      right ? (i + riskHalf + 1).toString() : '', right ? right.label : '', ...(right ? getSNN(data.riesgos, right.item_key) : ['', '', ''])
+      (i+1).toString(), left.label, SNNSi(data.riesgos, left.item_key), SNNNo(data.riesgos, left.item_key), SNNNa(data.riesgos, left.item_key),
+      right ? (i + riskHalf + 1).toString() : '', right ? right.label : '', right ? SNNSi(data.riesgos, right.item_key) : '', right ? SNNNo(data.riesgos, right.item_key) : '', right ? SNNNa(data.riesgos, right.item_key) : ''
     ]);
   }
 
@@ -958,13 +995,13 @@ export const generateHPTPDF = async (data: any, questions: any[] = []) => {
   for(let i=0; i < measureHalf; i++) {
     const left = measureItems[i];
     const right = measureItems[i + measureHalf];
-    const getSNN = (obj: any, key: string) => {
-      const val = obj?.[key];
-      return [val === 'SI' ? 'X' : '', val === 'NO' ? 'X' : '', val === 'N/A' ? 'X' : ''];
-    };
+    const SNNSi = (obj: any, key: string) => obj?.[key] === 'SI' ? 'X' : '';
+    const SNNNo = (obj: any, key: string) => obj?.[key] === 'NO' ? 'X' : '';
+    const SNNNa = (obj: any, key: string) => obj?.[key] === 'N/A' ? 'X' : '';
+
     measureRows.push([
-      (i+1).toString(), left.label, ...getSNN(data.medidas, left.item_key),
-      right ? (i + measureHalf + 1).toString() : '', right ? right.label : '', ...(right ? getSNN(data.medidas, right.item_key) : ['', '', ''])
+      (i+1).toString(), left.label, SNNSi(data.medidas, left.item_key), SNNNo(data.medidas, left.item_key), SNNNa(data.medidas, left.item_key),
+      right ? (i + measureHalf + 1).toString() : '', right ? right.label : '', right ? SNNSi(data.medidas, right.item_key) : '', right ? SNNNo(data.medidas, right.item_key) : '', right ? SNNNa(data.medidas, right.item_key) : ''
     ]);
   }
 
@@ -1017,21 +1054,45 @@ export const generateHPTPDF = async (data: any, questions: any[] = []) => {
     columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: 60 }, 2: { cellWidth: 60 } }
   });
 
-  currentY = (doc as any).lastAutoTable.finalY + 10;
+  currentY = (doc as any).lastAutoTable.finalY + 15;
   
-  // Final Signature
-  const sigX = pageWidth / 2;
-  doc.line(sigX - 30, currentY + 15, sigX + 30, currentY + 15);
-  doc.setFontSize(8);
-  doc.text("FIRMA FINAL SUPERVISOR", sigX, currentY + 20, { align: "center" });
-  doc.text(data.supervisorName || "", sigX, currentY + 24, { align: "center" });
-  
-  const fsig = data.firmaSupervisor || data.firmasupervisor;
-  if(fsig) {
-    try { doc.addImage(fsig, 'PNG', sigX - 25, currentY - 5, 50, 18); } catch(e){}
-  }
+  // Final Signature logic
+  const sigY = currentY + 15;
+  if (data.prevencion_signature_url || data.prevencionsignatureurl) {
+    const leftX = margin + 30;
+    const rightX = pageWidth - margin - 30;
 
-  doc.save(`HPT-${data.folio || '000'}-${new Date(data.fecha || Date.now()).toISOString().split('T')[0]}.pdf`);
+    // Supervisor
+    doc.line(leftX - 30, sigY, leftX + 30, sigY);
+    doc.setFontSize(8);
+    doc.text("FIRMA SUPERVISOR", leftX, sigY + 5, { align: "center" });
+    doc.text(data.supervisorName || data.supervisorname || "", leftX, sigY + 9, { align: "center" });
+    const fsig = data.firmaSupervisor || data.firmasupervisor;
+    if(fsig) {
+      try { doc.addImage(fsig, 'PNG', leftX - 25, sigY - 20, 50, 18); } catch(e){}
+    }
+
+    // Prevención
+    doc.line(rightX - 30, sigY, rightX + 30, sigY);
+    doc.text("FIRMA PREVENCIÓN", rightX, sigY + 5, { align: "center" });
+    doc.text(data.prevencionName || data.prevencionname || "Depto. Prevención", rightX, sigY + 9, { align: "center" });
+    const psig = data.prevencion_signature_url || data.prevencionsignatureurl;
+    if(psig) {
+      try { doc.addImage(psig, 'PNG', rightX - 25, sigY - 20, 50, 18); } catch(e){}
+    }
+  } else {
+    const sigX = pageWidth / 2;
+    doc.line(sigX - 30, sigY, sigX + 30, sigY);
+    doc.setFontSize(8);
+    doc.text("FIRMA FINAL SUPERVISOR", sigX, sigY + 5, { align: "center" });
+    doc.text(data.supervisorName || data.supervisorname || "", sigX, sigY + 9, { align: "center" });
+    
+    const fsig = data.firmaSupervisor || data.firmasupervisor;
+    if(fsig) {
+      try { doc.addImage(fsig, 'PNG', sigX - 25, sigY - 20, 50, 18); } catch(e){}
+    }
+  }
+  return doc;
 };
 
 // --- CHARLA PDF GENERATOR ---

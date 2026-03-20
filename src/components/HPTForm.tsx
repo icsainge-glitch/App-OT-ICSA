@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useUser, useUserProfile } from "@/lib/auth-provider";
 import { getActiveProjects, saveHPT, getNextFolioHPT, getPersonnel, getHPTQuestions } from "@/actions/db-actions";
+import { sendHPTSignatureRequest } from "@/ai/flows/send-hpt-signature-request-flow";
 import { useActionData } from "@/hooks/use-action-data";
 import {
   Dialog,
@@ -43,7 +44,8 @@ const STEPS = [
   { id: 'risks', title: 'Riesgos Potenciales', icon: AlertTriangle },
   { id: 'medidas', title: 'Medidas Seguridad', icon: CheckCircle2 },
   { id: 'epp', title: 'EPP Requerido', icon: Shield },
-  { id: 'review', title: 'Firma Supervisor', icon: Save }
+  { id: 'review', title: 'Firma Supervisor', icon: Save },
+  { id: 'prevencion', title: 'Firma Prevención', icon: ShieldCheck }
 ];
 
 export function HPTForm({ initialData }: { initialData?: any }) {
@@ -53,14 +55,29 @@ export function HPTForm({ initialData }: { initialData?: any }) {
   const { userProfile, isProfileLoading } = useUserProfile();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    id?: string;
+    projectId: string;
+    projectName: string;
+    supervisorName: string;
+    supervisorRut: string;
+    fecha: string;
+    trabajoRealizar: string;
+    firmaSupervisor: string;
+    prevencionName: string;
+    prevencionEmail: string;
+    status: string;
+  }>({
     id: initialData?.id || undefined,
     projectId: initialData?.projectId || initialData?.projectid || "",
+    projectName: initialData?.projectName || initialData?.projectname || "",
     supervisorName: initialData?.supervisorName || initialData?.supervisorname || "",
     supervisorRut: initialData?.supervisorRut || initialData?.supervisorrut || "",
     fecha: initialData?.fecha || new Date().toISOString().split('T')[0],
     trabajoRealizar: initialData?.trabajoRealizar || initialData?.trabajorealizar || "",
     firmaSupervisor: initialData?.firmaSupervisor || initialData?.firmasupervisor || "",
+    prevencionName: initialData?.prevencionName || initialData?.prevencionname || "José Mellado",
+    prevencionEmail: initialData?.prevencionEmail || initialData?.prevencionemail || "icsaprevencion@gmail.com",
     status: initialData?.status || "Borrador"
   });
 
@@ -250,12 +267,6 @@ export function HPTForm({ initialData }: { initialData?: any }) {
       epp,
       status: isFinal ? "Completado" : "Borrador",
       createdBy: user.uid,
-      // Ensure lowercase keys for DB if it expects them
-      projectid: formData.projectId,
-      supervisorname: formData.supervisorName,
-      supervisorrut: formData.supervisorRut,
-      trabajorealizar: formData.trabajoRealizar,
-      firmasupervisor: formData.firmaSupervisor
     };
 
     const result = await saveHPT(hptPayload, workers);
@@ -263,9 +274,60 @@ export function HPTForm({ initialData }: { initialData?: any }) {
 
     if (result.success) {
       toast({ title: isFinal ? "HPT Finalizado" : "Borrador Guardado", description: "El documento ha sido registrado exitosamente." });
-      router.push("/hpt");
+      if (isFinal) {
+        router.push("/hpt");
+      } else {
+        setFormData(prev => ({ ...prev, id: result.id }));
+      }
     } else {
       toast({ variant: "destructive", title: "Error", description: result.error });
+    }
+  };
+
+  const sendSignatureRequest = async () => {
+    if (!formData.prevencionEmail) {
+      toast({ variant: "destructive", title: "Email Requerido", description: "Ingrese el email de prevención." });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 1. Save current state first
+      const hptPayload = {
+        ...formData,
+        folio: folio,
+        recursos,
+        riesgos,
+        medidas,
+        epp,
+        status: "Pendiente",
+        createdBy: user?.uid,
+      };
+
+      const saveRes = await saveHPT(hptPayload, workers);
+      if (!saveRes.success) throw new Error(saveRes.error);
+
+      const hptId = saveRes.id;
+
+      // 2. Trigger flow
+      const flowRes = await sendHPTSignatureRequest({
+        id: hptId!,
+        recipientEmail: formData.prevencionEmail,
+        prevencionName: formData.prevencionName || "Prevencionista",
+        folio: folio,
+        baseUrl: window.location.origin
+      });
+
+      if (flowRes.success) {
+        toast({ title: "Solicitud Enviada", description: `Se ha enviado un correo a ${formData.prevencionEmail}` });
+        router.push("/hpt");
+      } else {
+        throw new Error(flowRes.error);
+      }
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Error", description: e.message });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -335,7 +397,15 @@ export function HPTForm({ initialData }: { initialData?: any }) {
                     <select 
                       className="w-full h-14 rounded-2xl bg-muted/30 border-none px-6 font-bold text-sm outline-none focus:ring-2 focus:ring-primary/20 appearance-none"
                       value={formData.projectId}
-                      onChange={(e) => setFormData(prev => ({ ...prev, projectId: e.target.value }))}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const proj = projects?.find(p => p.id === val);
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          projectId: val,
+                          projectName: proj ? proj.name : (val === "" || val === "none" ? "General / Sin Proyecto" : prev.projectName)
+                        }));
+                      }}
                     >
                       <option value="">Independiente / Sin Proyecto</option>
                       {projects?.map(p => (
@@ -624,7 +694,7 @@ export function HPTForm({ initialData }: { initialData?: any }) {
             )}
 
 
-            {/* Step 6: Final Signature */}
+            {/* Step 6: Final Supervisor Signature */}
             {currentStep === 6 && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="bg-primary/5 rounded-3xl p-6 border border-primary/10">
@@ -648,22 +718,84 @@ export function HPTForm({ initialData }: { initialData?: any }) {
                 <div className="pt-6 flex flex-col gap-3">
                   <Button 
                     type="button" 
-                    onClick={() => onSubmit(true)} 
-                    disabled={loading || !formData.firmaSupervisor}
+                    onClick={() => handleNext()} 
+                    disabled={!formData.firmaSupervisor}
                     className="h-20 bg-primary text-white rounded-[2rem] font-black text-xl uppercase tracking-tighter shadow-xl shadow-primary/30"
                   >
-                    {loading ? <Loader2 className="animate-spin h-6 w-6 mr-3" /> : <Save className="h-6 w-6 mr-3" />}
-                    Finalizar y Guardar HPT
+                    Siguiente: Firma Prevención
                   </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 7: Prevención Signature Request */}
+            {currentStep === 7 && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="bg-primary/5 rounded-3xl p-6 border border-primary/10 text-center">
+                  <ShieldCheck className="h-12 w-12 text-primary mx-auto mb-4" />
+                  <h4 className="font-black uppercase text-lg text-primary mb-2">Solicitud de Firma Remota</h4>
+                  <p className="text-[11px] font-medium leading-relaxed opacity-80">
+                    Para finalizar la HPT, es necesario que el Departamento de Prevención revise y firme el documento.
+                    Se enviará un enlace seguro al correo electrónico especificado.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Nombre Prevencionista (Opcional)</Label>
+                    <Input 
+                      placeholder="Ej: Juan Pérez"
+                      value={formData.prevencionName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, prevencionName: e.target.value }))}
+                      className="h-14 bg-muted/30 border-none rounded-2xl font-bold px-6 shadow-inner"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Email Prevencionista</Label>
+                    <Input 
+                      type="email"
+                      placeholder="prevencionista@icsaingenieria.cl"
+                      value={formData.prevencionEmail}
+                      onChange={(e) => setFormData(prev => ({ ...prev, prevencionEmail: e.target.value }))}
+                      className="h-14 bg-muted/30 border-none rounded-2xl font-bold px-6 shadow-inner"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-6 flex flex-col gap-3">
                   <Button 
                     type="button" 
-                    variant="ghost"
-                    onClick={() => onSubmit(false)} 
-                    disabled={loading}
-                    className="h-14 font-black text-xs uppercase tracking-widest text-muted-foreground hover:bg-muted"
+                    onClick={sendSignatureRequest} 
+                    disabled={loading || !formData.prevencionEmail || !formData.firmaSupervisor}
+                    className="h-24 bg-primary text-white rounded-[2.5rem] font-black text-2xl uppercase tracking-tighter shadow-2xl shadow-primary/40 border-b-8 border-primary/50 active:border-b-0 active:translate-y-1 transition-all"
                   >
-                    Guardar como Borrador
+                    {loading ? <Loader2 className="animate-spin h-8 w-8 mr-3" /> : <ShieldCheck className="h-8 w-8 mr-3" />}
+                    Enviar Firma a Prevención
                   </Button>
+                  
+                  <div className="flex gap-2">
+                    <Button 
+                      type="button" 
+                      variant="outline"
+                      onClick={() => onSubmit(false)} 
+                      disabled={loading}
+                      className="h-14 flex-1 font-black text-xs uppercase tracking-widest text-muted-foreground rounded-2xl"
+                    >
+                      <Save className="h-4 w-4 mr-2" /> Guardar Borrador
+                    </Button>
+                    
+                    {isAdmin && (
+                      <Button 
+                        type="button" 
+                        variant="secondary"
+                        onClick={() => onSubmit(true)} 
+                        disabled={loading || !formData.firmaSupervisor}
+                        className="h-14 flex-1 font-black text-xs uppercase tracking-widest rounded-2xl"
+                      >
+                         Omitir y Finalizar (Admin)
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -675,7 +807,7 @@ export function HPTForm({ initialData }: { initialData?: any }) {
                   <ArrowLeft className="mr-2 h-5 w-5 group-hover:-translate-x-1 transition-transform" /> Atrás
                 </Button>
               )}
-              {currentStep < 6 && (
+              {currentStep < 7 && (
                 <Button type="button" onClick={handleNext} className="h-16 flex-[1.5] rounded-2xl bg-primary text-white font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/30 group">
                   Siguiente <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Button>

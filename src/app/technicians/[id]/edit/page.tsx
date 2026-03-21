@@ -35,7 +35,6 @@ export default function EditTechnician({ params }: { params: Promise<{ id: strin
 
   const [loading, setLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
-  const initializedIdRef = React.useRef<string | null>(null);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
 
@@ -54,15 +53,20 @@ export default function EditTechnician({ params }: { params: Promise<{ id: strin
     confirmPassword: ""
   });
 
+  const [isInitialized, setIsInitialized] = useState(false);
+
   useEffect(() => {
-    if (personnel && personnel.id !== initializedIdRef.current) {
+    if (personnel && !isInitialized) {
+      console.log("[DATA_INIT] Initializing form with:", personnel);
+      
       // Normalizar el rol para que coincida con el Select
       const rawRole = personnel.rol_t || "tecnico";
       let normalizedRole = "tecnico";
-      if (rawRole.toLowerCase().includes("admin")) normalizedRole = "admin";
-      else if (rawRole.toLowerCase().includes("supervisor")) normalizedRole = "supervisor";
-      else if (rawRole.toLowerCase().includes("prevenc") || rawRole.toLowerCase().includes("prevencionista")) normalizedRole = "prevencionista";
-      else if (rawRole.toLowerCase().includes("tecnico") || rawRole.toLowerCase().includes("técnico")) normalizedRole = "tecnico";
+      const lr = rawRole.toLowerCase();
+      if (lr.includes("admin")) normalizedRole = "admin";
+      else if (lr.includes("supervisor")) normalizedRole = "supervisor";
+      else if (lr.includes("prevenc")) normalizedRole = "prevencionista";
+      else if (lr.includes("tecnico") || lr.includes("técnico")) normalizedRole = "tecnico";
 
       setFormData({
         nombre_t: personnel.nombre_t || personnel.name || "",
@@ -73,10 +77,9 @@ export default function EditTechnician({ params }: { params: Promise<{ id: strin
         estado_t: personnel.estado_t || "Activo",
         currentPassword: personnel.password || "********"
       });
-      initializedIdRef.current = personnel.id;
-      console.log("[DATA_INIT] Form initialized aggressively with:", personnel);
+      setIsInitialized(true);
     }
-  }, [personnel]);
+  }, [personnel, isInitialized]);
 
   useEffect(() => {
     if (!isUserLoading) {
@@ -110,7 +113,7 @@ export default function EditTechnician({ params }: { params: Promise<{ id: strin
     }
 
     try {
-      const { email_t, cel_t, ...rest } = formData;
+      const { email_t, cel_t, currentPassword, ...rest } = formData;
       await updatePersonnel(id, {
         ...rest,
         email: email_t,
@@ -119,7 +122,7 @@ export default function EditTechnician({ params }: { params: Promise<{ id: strin
         updatedBy: user.email
       });
       toast({ title: "Cambios Guardados", description: "El perfil ha sido actualizado correctamente." });
-      router.push("/dashboard");
+      setLoading(false);
     } catch (error) {
       setLoading(false);
       toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar el registro." });
@@ -205,6 +208,11 @@ export default function EditTechnician({ params }: { params: Promise<{ id: strin
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/technicians">
+              <Button variant="outline" className="rounded-xl h-10 font-bold hidden sm:flex">
+                Volver a la Lista
+              </Button>
+            </Link>
             <Button onClick={handleSubmit} disabled={loading} className="bg-primary hover:bg-primary/90 font-black rounded-xl h-10 shadow-[0_6px_15px_rgba(var(--primary),0.2)] transition-all hover:-translate-y-0.5 px-6 gap-2">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               <span className="hidden sm:inline">Guardar Cambios</span>

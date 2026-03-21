@@ -215,11 +215,11 @@ function DashboardContent() {
 
   const toolsSummary = useMemo(() => {
     if (!tools) return {};
-    const summary: { [key: string]: string[] } = {};
+    const summary: { [key: string]: { nombre: string, id: string }[] } = {};
     tools.forEach((t: any) => {
       if (t.estado === 'En Terreno' && t.asignadoA) {
         if (!summary[t.asignadoA]) summary[t.asignadoA] = [];
-        summary[t.asignadoA].push(t.nombre);
+        summary[t.asignadoA].push({ nombre: t.nombre, id: t.codigoInterno });
       }
     });
     return summary;
@@ -227,7 +227,7 @@ function DashboardContent() {
 
   const myTools = useMemo(() => {
     if (!tools || !user) return [];
-    const identifier = userProfile?.name || user?.email;
+    const identifier = userProfile?.nombre_t || userProfile?.name || user?.email;
     return tools.filter((t: any) => t.asignadoA === identifier && t.estado === 'En Terreno');
   }, [tools, user, userProfile]);
 
@@ -377,7 +377,7 @@ function DashboardContent() {
     
     setIsAssigning(true);
     try {
-      const identifier = userProfile?.name || user?.email || "Usuario";
+      const identifier = userProfile?.nombre_t || userProfile?.name || user?.email || "Usuario";
       await assignMultipleTools(selectedAvailableToolIds, identifier, tempSignature);
       toast({ 
         title: "Herramientas asignadas", 
@@ -393,7 +393,7 @@ function DashboardContent() {
     }
   };
 
-  const userIdentifier = userProfile?.name || user?.email || "";
+  const userIdentifier = userProfile?.nombre_t || userProfile?.name || user?.email || "";
 
   const getPageTitle = () => {
     switch (activeTab) {
@@ -642,10 +642,12 @@ function DashboardContent() {
                         <span className="font-black text-primary text-xs uppercase truncate">{name}</span>
                       </div>
                       <div className="space-y-1.5 ml-2 border-l-2 border-primary/10 pl-3">
-                        {toolsList.map((toolName: string, i: number) => (
+                        {toolsList.map((tool: any, i: number) => (
                           <div key={i} className="flex items-start gap-2">
                             <div className="w-2 h-2 rounded-full bg-accent mt-1.5 shrink-0" />
-                            <span className="text-xs font-bold text-muted-foreground uppercase leading-tight">{toolName}</span>
+                            <span className="text-xs font-bold text-muted-foreground uppercase leading-tight whitespace-nowrap">
+                              {tool.nombre} <span className="text-primary font-black ml-1">({tool.id || 'S/N'})</span>
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -1163,7 +1165,7 @@ function DashboardContent() {
                     </div>
                     <div className="flex flex-col gap-2">
                       <Label htmlFor="categoria" className="text-xs font-black uppercase tracking-widest text-primary ml-1">Categoría</Label>
-                      <Select name="categoria" defaultValue={editingTool?.categoria || "Eléctrica"}>
+                      <Select name="categoria" defaultValue={editingTool?.categoria || ""}>
                         <SelectTrigger className="rounded-xl border-primary/10 h-11"><SelectValue /></SelectTrigger>
                         <SelectContent className="rounded-xl border-none shadow-2xl">
                           <SelectItem value="Eléctrica">Herramienta Eléctrica</SelectItem>

@@ -645,24 +645,48 @@ export const generateBatchReturnActPDF = async (movements: any[]) => {
   doc.text(isAssignment ? "DETALLE DE HERRAMIENTAS ASIGNADAS" : "DETALLE DE HERRAMIENTAS ENTREGADAS", margin, currentY);
   currentY += 8;
 
-  autoTable(doc, {
-    startY: currentY,
-    head: [['Herramienta', 'Marca / Modelo', 'Código / Serie', isAssignment ? 'Fecha Asig.' : 'Fecha Retiro', isAssignment ? 'Categoría' : 'Fecha Devol.']],
-    body: movements.map((m: any) => [
+  const tableHead = isAssignment 
+    ? [['Herramienta', 'Marca / Modelo', 'Código / Serie', 'Fecha Asig.']]
+    : [['Herramienta', 'Marca / Modelo', 'Código / Serie', 'Fecha Asig. Original', 'Fecha Devolución']];
+
+  const tableBody = movements.map((m: any) => {
+    const commonFields = [
       m.toolName,
       `${m.marca || ''} ${m.modelo || ''}`.trim() || 'N/A',
-      `${m.codigoInterno || ''} ${m.serie ? '/ ' + m.serie : ''}`.trim() || 'N/A',
-      new Date(m.timestamp).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      isAssignment ? (m.categoria || m.category || 'Equipo') : (m.assignmentDate ? new Date(m.assignmentDate).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A')
-    ]),
+      `${m.codigoInterno || ''} ${m.serie ? '/ ' + m.serie : ''}`.trim() || 'N/A'
+    ];
+    
+    if (isAssignment) {
+      return [
+        ...commonFields,
+        new Date(m.timestamp).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      ];
+    } else {
+      return [
+        ...commonFields,
+        m.assignmentDate ? new Date(m.assignmentDate).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A',
+        new Date(m.timestamp).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      ];
+    }
+  });
+
+  autoTable(doc, {
+    startY: currentY,
+    head: tableHead,
+    body: tableBody,
     theme: 'grid',
     headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold' },
     bodyStyles: { fontSize: 8, textColor: [60, 60, 60], cellPadding: 4 },
-    columnStyles: {
+    columnStyles: isAssignment ? {
+      0: { cellWidth: 45, fontStyle: 'bold' },
+      1: { cellWidth: 50 },
+      2: { cellWidth: 45 },
+      3: { cellWidth: 'auto' }
+    } : {
       0: { cellWidth: 35, fontStyle: 'bold' },
       1: { cellWidth: 40 },
       2: { cellWidth: 40 },
-      3: { cellWidth: 35 },
+      3: { cellWidth: 40 },
       4: { cellWidth: 'auto' }
     },
     margin: { left: margin, right: margin }

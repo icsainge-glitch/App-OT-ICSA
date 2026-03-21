@@ -67,7 +67,16 @@ const KEY_MAPPING: { [key: string]: string } = {
     'clientname': 'clientName',
     'teamnames': 'teamNames',
     'imageurl': 'imageUrl',
-    'descripcion': 'descripcion'
+    'descripcion': 'descripcion',
+    'toolid': 'toolId',
+    'toolname': 'toolName',
+    'assignmentdate': 'assignmentDate',
+    'batchid': 'batchId',
+    'signatureurl': 'signatureUrl',
+    'lastreturndate': 'lastReturnDate',
+    'asignadoa': 'asignadoA',
+    'codigointerno': 'codigoInterno',
+    'categoria': 'categoria'
 };
 
 // Reverse mapping for toDbPayload
@@ -97,12 +106,22 @@ function toDbPayload(data: any) {
 function fromDbPayload(data: any | any[]): any {
     if (!data) return data;
     if (Array.isArray(data)) return data.map(item => fromDbPayload(item) as any);
+    if (typeof data !== 'object') return data;
     
     const result: any = { ...data };
     Object.keys(data).forEach(key => {
+        const val = data[key];
         const mappedKey = KEY_MAPPING[key.toLowerCase()];
+        
+        // Handle nested objects
+        const processedVal = (val && typeof val === 'object' && !Array.isArray(val) && !(val instanceof Date)) 
+            ? fromDbPayload(val) 
+            : val;
+
         if (mappedKey && mappedKey !== key) {
-            result[mappedKey] = data[key];
+            result[mappedKey] = processedVal;
+        } else {
+            result[key] = processedVal;
         }
     });
     return result;
@@ -607,19 +626,29 @@ export async function getPersonnelById(id: string) {
 
         // 2. Fallback por Email (si id no es UUID o falló búsqueda)
         if (!person) {
-            console.log(`[DEBUG_DB] No encontrado por ID. Probando fallback por Email...`);
-            const { data: listByEmail, error: errEmail } = await supabase
-                .from('personnel')
+            console.log(`[DEBUG_DB] No encontrado en personnel. Probando fallback final en users...`);
+            const { data: userRecord, error: errUserFound } = await supabase
+                .from('users')
                 .select('*')
-                .eq('email', id)
-                .limit(1);
+                .or(`id.eq.${id},email.eq.${id}`)
+                .limit(1)
+                .single();
             
-            if (errEmail) console.error(`[DEBUG_DB] Error buscando por Email:`, errEmail.message);
-            person = listByEmail && listByEmail.length > 0 ? listByEmail[0] : null;
+            if (userRecord && !errUserFound) {
+                console.log(`[DEBUG_DB] Encontrado en users: "${userRecord.name}".`);
+                person = {
+                    id: userRecord.id,
+                    nombre_t: userRecord.name,
+                    email: userRecord.email,
+                    rol_t: userRecord.role,
+                    rut_t: userRecord.rut,
+                    estado_t: 'Activo'
+                };
+            }
         }
 
         if (!person) {
-            console.warn(`[DEBUG_DB] FINAL: No se encontró registro para "${id}" en personnel.`);
+            console.warn(`[DEBUG_DB] FINAL: No se encontró registro para "${id}" en personnel ni en users.`);
             return null;
         }
 
@@ -654,9 +683,16 @@ export async function createPersonnel(data: any) {
 
 export async function updatePersonnel(id: string, data: any) {
     try {
-        const { error: personnelError } = await supabase.from('personnel').update(toDbPayload(data)).eq('id', id);
+        const payload = toDbPayload(data);
+        // Ensure ID is in payload for upsert
+        payload.id = id;
+        
+        const { error: personnelError } = await supabase
+            .from('personnel')
+            .upsert(payload, { onConflict: 'id' });
+
         if (personnelError) {
-            console.error("Error updating personnel:", personnelError.message);
+            console.error("Error updating personnel (upsert):", personnelError.message);
             throw personnelError;
         }
 
@@ -1156,7 +1192,7 @@ export async function getToolMovements(period: 'daily' | 'weekly' | 'monthly' | 
     noStore();
     let query = supabase
         .from('tool_movements')
-        .select('*, herramientas(marca, modelo, serie, codigoInterno, categoria)')
+        .select('*, herramientas(marca, modelo, serie, codigointerno, categoria)')
         .order('timestamp', { ascending: false });
 
     if (period !== 'all') {
@@ -1176,24 +1212,27 @@ export async function getToolMovements(period: 'daily' | 'weekly' | 'monthly' | 
     const { data, error } = await query;
     if (error) throw error;
     
-    // Flatten result to match original expectation if needed
-    return (data || []).map((m: any) => ({
+    // Flatten result to match original expectation
+    const movements = fromDbPayload(data || []) as any[];
+    return movements.map((m: any) => ({
         ...m,
-        marca: (m.herramientas as any)?.marca,
-        modelo: (m.herramientas as any)?.modelo,
-        serie: (m.herramientas as any)?.serie,
-        codigoInterno: (m.herramientas as any)?.codigoInterno,
-        categoria: (m.herramientas as any)?.categoria,
+        marca: m.herramientas?.marca,
+        modelo: m.herramientas?.modelo,
+        serie: m.herramientas?.serie,
+        codigoInterno: m.herramientas?.codigoInterno,
+        categoria: m.herramientas?.categoria,
     }));
 }
 
 export async function saveTool(data: any, signatureUrl?: string) {
     try {
-        const { data: currentTool } = await supabase
+        const { data: rawTool } = await supabase
             .from('herramientas')
-            .select('estado, asignadoA, nombre, notas')
+            .select('estado, asignadoa, nombre, notas')
             .eq('id', data.id)
             .single();
+        
+        const currentTool = fromDbPayload(rawTool);
 
         let action = '';
         let comment = '';
@@ -1281,7 +1320,7 @@ export async function approveToolReturn(toolId: string) {
     }
 
     await supabase.from('herramientas')
-        .update({ estado: 'Disponible', asignadoa: '' })
+        .update(toDbPayload({ estado: 'Disponible', asignadoA: '' }))
         .eq('id', toolId);
 
     revalidatePath('/dashboard');
@@ -1297,14 +1336,13 @@ export async function returnMultipleTools(toolIds: string[], comment: string, as
         const { data: tool } = await supabase.from('herramientas').select('nombre, notas').eq('id', id).single();
         
         // Update Tool
-        await supabase.from('herramientas').update({
+        await supabase.from('herramientas').update(toDbPayload({
             estado: 'Disponible',
-            asignadoa: '',
-            lastreturndate: timestamp,
-            updatedat: timestamp,
-            // Simple append for notes in Supabase
+            asignadoA: '',
+            lastReturnDate: timestamp,
+            updatedAt: timestamp,
             notas: `${comment}\n---\n${tool?.notas || ''}`
-        }).eq('id', id);
+        })).eq('id', id);
 
         // Fetch last assignment
         const { data: assign } = await supabase.from('tool_movements')
@@ -1316,7 +1354,7 @@ export async function returnMultipleTools(toolIds: string[], comment: string, as
             .single();
 
         // Insert Movement
-        await supabase.from('tool_movements').insert({
+        await supabase.from('tool_movements').insert(toDbPayload({
             id: crypto.randomUUID(),
             toolId: id,
             toolName: tool?.nombre || 'Desconocida',
@@ -1328,7 +1366,7 @@ export async function returnMultipleTools(toolIds: string[], comment: string, as
             assignmentDate: assign?.timestamp || null,
             batchId,
             signatureUrl: signatureUrl || null
-        });
+        }));
     }
 
     revalidatePath('/dashboard');
@@ -1343,15 +1381,15 @@ export async function assignMultipleTools(toolIds: string[], asignadoA: string, 
     for (const id of toolIds) {
         const { data: tool } = await supabase.from('herramientas').select('nombre').eq('id', id).single();
         
-        await supabase.from('herramientas').update({
+        await supabase.from('herramientas').update(toDbPayload({
             estado: 'En Terreno',
-            asignadoa: asignadoA,
-            updatedat: timestamp
-        }).eq('id', id);
+            asignadoA: asignadoA,
+            updatedAt: timestamp
+        })).eq('id', id);
 
-        await supabase.from('tool_movements').insert({
+        await supabase.from('tool_movements').insert(toDbPayload({
             id: crypto.randomUUID(),
-            toolid: id,
+            toolId: id,
             toolName: tool?.nombre || 'Desconocida',
             action: 'Asignación',
             responsible: asignadoA,
@@ -1360,7 +1398,7 @@ export async function assignMultipleTools(toolIds: string[], asignadoA: string, 
             status: 'Verificado',
             batchId,
             signatureUrl: signatureUrl || null
-        });
+        }));
     }
 
     revalidatePath('/dashboard');

@@ -83,7 +83,7 @@ export default function Home() {
               <span className="text-[8px] font-bold opacity-60 uppercase tracking-[0.3em] mt-1">ingeniería comunicaciones S.A.</span>
             </div>
           </div>
-          <p className="text-xs opacity-40 font-bold">© 2024 ICSA ingeniería comunicaciones S.A. Todos los derechos reservados.</p>
+          <p className="text-xs opacity-40 font-bold">© 2026 ICSA ingeniería comunicaciones S.A. Todos los derechos reservados.</p>
         </div>
       </footer>
     </div>

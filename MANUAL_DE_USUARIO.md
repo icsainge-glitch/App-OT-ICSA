@@ -4,6 +4,16 @@ Bienvenido al **Portal de Gestión Técnica de ICSA (Ingeniería Comunicaciones 
 
 El objetivo de esta aplicación es digitalizar, agilizar y transparentar la creación de Órdenes de Trabajo (OTs), el control de proyectos, y el seguimiento de las herramientas y equipos de la empresa, asegurando que toda la documentación técnica y de seguridad esté respaldada digitalmente en tiempo real.
 
+### Infraestructura y Disponibilidad
+La plataforma está construida con tecnologías de última generación para garantizar su alta disponibilidad y seguridad:
+*   **Hosting:** La aplicación está alojada en **Vercel**, lo que asegura tiempos de carga mínimos y una respuesta global instantánea.
+*   **Base de Datos:** Toda la información y archivos están respaldados en **Supabase**, utilizando servicios de base de datos relacional y almacenamiento en la nube de alta seguridad.
+
+> [!NOTE]
+> Actualmente la plataforma utiliza las **versiones gratuitas** de estos servicios. Para garantizar un funcionamiento óptimo a largo plazo y sin restricciones de almacenamiento (especialmente para fotos y documentos), se recomienda escalar a **planes de pago** que ofrezcan mayor espacio y recursos dedicados.
+
+---
+
 ---
 
 ## Índice

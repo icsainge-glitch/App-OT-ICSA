@@ -81,13 +81,15 @@ export default function NewTechnician() {
         rol_t: formData.rol_t,
         estado_t: "Activo",
         createdAt: new Date().toISOString(),
-        registeredBy: user.email
+        registeredBy: user.uid
       };
 
       await createPersonnelAccount(personnelData, formData.password);
 
       toast({ title: "Personal Registrado", description: "El perfil ha sido creado con éxito." });
-      router.push("/dashboard");
+      setTimeout(() => {
+        router.push("/technicians");
+      }, 1000);
 
     } catch (error: any) {
       setLoading(false);

@@ -222,7 +222,7 @@ export default function EditWorkOrder({ params }: { params: Promise<{ id: string
       status: "Pendiente",
       folio: order?.folio || 0,
       updatedAt: new Date().toISOString(),
-      updatedBy: user.email || ""
+      updatedBy: user.uid || ""
     };
     try {
       const saveResult = await saveWorkOrderAndStatus(updateData, false);
@@ -249,7 +249,7 @@ export default function EditWorkOrder({ params }: { params: Promise<{ id: string
       status: "Completado",
       folio: order?.folio || 0,
       updatedAt: new Date().toISOString(),
-      updatedBy: user.email || ""
+      updatedBy: user.uid || ""
     };
     try {
       const saveResult = await saveWorkOrderAndStatus(updateData, true);

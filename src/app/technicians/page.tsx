@@ -43,7 +43,7 @@ export default function TechniciansListPage() {
     return null;
   }
 
-  const { data: staff, isLoading } = useActionData<any[]>(() => getPersonnel(), []);
+  const { data: staff, isLoading, refetch } = useActionData<any[]>(() => getPersonnel(), []);
 
   const filteredStaff = useMemo(() => {
     if (!staff) return [];
@@ -56,9 +56,20 @@ export default function TechniciansListPage() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    await deleteRecord("personnel", deleteId);
-    toast({ title: "Perfil de personal eliminado", description: "Refresque la página para ver los cambios." });
-    setDeleteId(null);
+    try {
+      await deleteRecord("personnel", deleteId, userProfile?.id, isAdmin);
+      toast({ title: "Perfil eliminado", description: "El colaborador ha sido removido del sistema." });
+      refetch();
+    } catch (e: any) {
+      console.error("Error al eliminar personal:", e);
+      toast({ 
+        title: "Error", 
+        description: "No se pudo eliminar el registro. Verifique permisos.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setDeleteId(null);
+    }
   };
 
   return (

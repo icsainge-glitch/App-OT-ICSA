@@ -111,7 +111,7 @@ export default function ProjectDetail({ params }: { params: Promise<{ id: string
       const result = await closeProject(
         id, 
         user.uid, 
-        user.email || 'Admin', 
+        user.uid || 'Admin', 
         userProfile?.name || 'Responsable', 
         clientEmail,
         signatureData

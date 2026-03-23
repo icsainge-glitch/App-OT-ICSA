@@ -96,7 +96,7 @@ export default function EditClient({ params }: { params: Promise<{ id: string }>
       await updateClient(id, {
         ...formData,
         updatedAt: new Date().toISOString(),
-        updatedBy: user.email
+        updatedBy: user.uid
       });
       toast({ title: "Cliente Actualizado", description: "Los cambios han sido guardados con éxito." });
       router.push("/dashboard");

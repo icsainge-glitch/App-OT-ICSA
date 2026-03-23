@@ -79,7 +79,7 @@ export default function NewClient() {
       ...formData,
       id: clientId,
       createdAt: new Date().toISOString(),
-      updatedBy: user.email
+      updatedBy: user.uid
     };
 
     try {

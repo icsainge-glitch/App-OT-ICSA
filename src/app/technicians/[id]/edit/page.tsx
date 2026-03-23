@@ -114,14 +114,21 @@ export default function EditTechnician({ params }: { params: Promise<{ id: strin
 
     try {
       const { email_t, cel_t, currentPassword, ...rest } = formData;
-      await updatePersonnel(id, {
+      const result = await updatePersonnel(id, {
         ...rest,
         email: email_t,
         telefono_t: cel_t,
-        updatedAt: new Date().toISOString(),
-        updatedBy: user.email
+        updatedBy: user.uid
       });
-      toast({ title: "Cambios Guardados", description: "El perfil ha sido actualizado correctamente." });
+
+      if (result.success) {
+        toast({ title: "Cambios Guardados", description: "El perfil ha sido actualizado correctamente." });
+        setTimeout(() => {
+          router.push("/technicians");
+        }, 1000);
+      } else {
+        toast({ variant: "destructive", title: "Error", description: result.error || "No se pudo actualizar." });
+      }
       setLoading(false);
     } catch (error) {
       setLoading(false);

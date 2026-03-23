@@ -588,9 +588,39 @@ export async function deleteRecord(table: string, id: string, userId?: string, i
     }
 
     // Hard delete for authorized users
-    const { error } = await supabase.from(table).delete().eq('id', id);
-    if (error) throw error;
-    return { success: true, mode: 'deleted' };
+    try {
+        if (table === 'personnel' || table === 'users') {
+            const targetId = id;
+            console.log(`[hard_delete] Removing personnel and user records for ID: ${targetId}`);
+            
+            // Delete from personnel first (due to FK)
+            await supabase.from('personnel').delete().eq('id', targetId);
+            // Then from public.users
+            const { error } = await supabase.from('users').delete().eq('id', targetId);
+            
+            if (error) {
+                if (error.code === '23503') {
+                    throw new Error('No se puede eliminar: el usuario tiene registros históricos (OTs, HPTs, etc.). Se recomienda Inactivar el usuario en lugar de eliminarlo.');
+                }
+                throw error;
+            }
+        } else {
+            const { error } = await supabase.from(table).delete().eq('id', id);
+            if (error) {
+                if (error.code === '23503') {
+                     throw new Error('No se puede eliminar el registro ya que está siendo referenciado en otras tablas.');
+                }
+                throw error;
+            }
+        }
+
+        revalidatePath('/technicians');
+        revalidatePath('/dashboard');
+        return { success: true, mode: 'deleted' };
+    } catch (e: any) {
+        console.error(`[deleteRecord_Error] Error deleting from ${table}:`, e);
+        throw e;
+    }
 }
 
 export async function createClient(data: any) {
@@ -683,16 +713,23 @@ export async function createPersonnel(data: any) {
 
 export async function updatePersonnel(id: string, data: any) {
     try {
+        console.log(`[UPDATE_PERSONNEL] Iniciando actualización para ID: ${id}`);
+        // Defensive fix: personnel table doesn't have 'updatedat' column
+        if (data.updatedAt) delete data.updatedAt;
+        if (data.updatedat) delete data.updatedat;
+        console.log(`[UPDATE_PERSONNEL] Datos recibidos:`, JSON.stringify(data));
+        
         const payload = toDbPayload(data);
-        // Ensure ID is in payload for upsert
         payload.id = id;
         
+        // 1. Update Personnel table
+        console.log(`[UPDATE_PERSONNEL] Upsert en tabla personnel con payload:`, JSON.stringify(payload));
         const { error: personnelError } = await supabase
             .from('personnel')
             .upsert(payload, { onConflict: 'id' });
 
         if (personnelError) {
-            console.error("Error updating personnel (upsert):", personnelError.message);
+            console.error("[UPDATE_PERSONNEL] Error en tabla personnel:", personnelError.message);
             throw personnelError;
         }
 
@@ -704,16 +741,24 @@ export async function updatePersonnel(id: string, data: any) {
         if (data.rut_t) syncData.rut = data.rut_t;
 
         if (Object.keys(syncData).length > 0) {
-            console.log(`[DIAGNOSTIC] Syncing user account ${id} with:`, JSON.stringify(syncData));
+            console.log(`[UPDATE_PERSONNEL] Sincronizando tabla users para ${id}:`, JSON.stringify(syncData));
             const { error: userError } = await supabase.from('users').update(syncData).eq('id', id);
-            if (userError) console.warn("Sync with users table failed:", userError.message);
+            
+            if (userError) {
+                console.error("[UPDATE_PERSONNEL] Error sincronizando tabla users:", userError.message);
+                // No lanzamos error aquí para no revertir el cambio en personnel, 
+                // pero lo registramos seriamente.
+            } else {
+                console.log("[UPDATE_PERSONNEL] Sincronización con users exitosa");
+            }
         }
 
         revalidatePath('/technicians');
         revalidatePath('/dashboard');
+        console.log("[UPDATE_PERSONNEL] Actualización completada con éxito");
         return { success: true };
     } catch (e: any) {
-        console.error("Error in updatePersonnel:", e);
+        console.error("[UPDATE_PERSONNEL] ERROR CRÍTICO:", e);
         return { success: false, error: e.message };
     }
 }

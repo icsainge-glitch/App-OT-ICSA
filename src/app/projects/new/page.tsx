@@ -91,7 +91,7 @@ export default function NewProject() {
       id: projectId,
       status: "Active",
       createdBy: user.uid,
-      creatorEmail: user.email || "",
+      creatorEmail: user.uid || "",
       startDate: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
